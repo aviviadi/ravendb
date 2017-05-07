@@ -104,7 +104,6 @@ namespace Raven.Server.Web.System
         {
             var name = GetQueryStringValueAndAssertIfSingleAndNotEmpty("name");
             var node = GetStringQueryString("node", false);
-            var encrypted = GetBoolValueQueryString("encrypted", required: false) ?? false;
 
             string errorMessage;
             if (ResourceNameValidator.IsValidResourceName(name, ServerStore.Configuration.Core.DataDirectory.FullPath, out errorMessage) == false)
@@ -145,7 +144,7 @@ namespace Raven.Server.Web.System
 
                 var topologyJson = EntityToBlittable.ConvertEntityToBlittable(databaseRecord, DocumentConventions.Default, context);
 
-                var index = await ServerStore.WriteDbAsync(context, name, topologyJson, etag, encrypted);
+                var index = await ServerStore.WriteDbAsync(context, name, topologyJson, etag);
                 await ServerStore.Cluster.WaitForIndexNotification(index);
                 ServerStore.NotificationCenter.Add(DatabaseChanged.Create(name, DatabaseChangeType.Put));
 
@@ -168,7 +167,6 @@ namespace Raven.Server.Web.System
         public async Task Put()
         {
             var name = GetQueryStringValueAndAssertIfSingleAndNotEmpty("name");
-            var encrypted = GetBoolValueQueryString("encrypted", required: false) ?? false;
 
             string errorMessage;
             if (ResourceNameValidator.IsValidResourceName(name, ServerStore.Configuration.Core.DataDirectory.FullPath, out errorMessage) == false)
@@ -193,37 +191,12 @@ namespace Raven.Server.Web.System
                     throw new BadRequestException("Database document validation failed.", e);
                 }
                 var factor = Math.Max(1, GetIntValueQueryString("replication-factor", required: false) ?? 0);
-                var topology = new DatabaseTopology();
-                
-                var clusterTopology = ServerStore.GetClusterTopology(context);
 
-                var allNodes = clusterTopology.Members.Keys
-                    .Concat(clusterTopology.Promotables.Keys)
-                    .Concat(clusterTopology.Watchers.Keys)
-                    .ToArray();
+                DatabaseTopology topology = document.Topology?.Members?.Count > 0 ? 
+                    AssignNodesToDatabase(context, factor, name, json) : 
+                    document.Topology;
 
-                var offset = new Random().Next();
-
-                foreach (var node in allNodes)
-                {
-                    topology.NameToUrlMap[node] = clusterTopology.GetUrlFromTag(node);
-                }
-
-                for (int i = 0; i < Math.Min(allNodes.Length, factor); i++)
-                {
-                    var selectedNode = allNodes[(i + offset) % allNodes.Length];
-                    topology.AddMember(selectedNode, name);
-                }
-
-                var topologyJson = EntityToBlittable.ConvertEntityToBlittable(topology, DocumentConventions.Default, context);
-
-                json.Modifications = new DynamicJsonValue(json)
-                {
-                    [nameof(DatabaseRecord.DatabaseName)] = name,
-                    [nameof(DatabaseRecord.Topology)] = topologyJson,
-                };
-
-                var index = await ServerStore.WriteDbAsync(context, name, json, etag, encrypted);
+                var index = await ServerStore.WriteDbAsync(context, name, json, etag);
                 await ServerStore.Cluster.WaitForIndexNotification(index);
 
                 ServerStore.NotificationCenter.Add(DatabaseChanged.Create(name, DatabaseChangeType.Put));
@@ -241,6 +214,41 @@ namespace Raven.Server.Web.System
                     writer.Flush();
                 }
             }
+        }
+
+        private DatabaseTopology AssignNodesToDatabase(TransactionOperationContext context, int factor, string name, BlittableJsonReaderObject json)
+        {
+            var topology = new DatabaseTopology();
+
+            var clusterTopology = ServerStore.GetClusterTopology(context);
+
+            var allNodes = clusterTopology.Members.Keys
+                .Concat(clusterTopology.Promotables.Keys)
+                .Concat(clusterTopology.Watchers.Keys)
+                .ToArray();
+
+            var offset = new Random().Next();
+
+            foreach (var node in allNodes)
+            {
+                topology.NameToUrlMap[node] = clusterTopology.GetUrlFromTag(node);
+            }
+
+            for (int i = 0; i < Math.Min(allNodes.Length, factor); i++)
+            {
+                var selectedNode = allNodes[(i + offset) % allNodes.Length];
+                topology.AddMember(selectedNode, name);
+            }
+
+            var topologyJson = EntityToBlittable.ConvertEntityToBlittable(topology, DocumentConventions.Default, context);
+
+            json.Modifications = new DynamicJsonValue(json)
+            {
+                [nameof(DatabaseRecord.DatabaseName)] = name,
+                [nameof(DatabaseRecord.Topology)] = topologyJson,
+            };
+
+            return topology;
         }
 
         [RavenAction("/admin/expiration/config", "POST", "/admin/config-expiration?name={databaseName:string}")]
@@ -492,7 +500,7 @@ namespace Raven.Server.Web.System
 
                     var json = EntityToBlittable.ConvertEntityToBlittable(dbDoc, DocumentConventions.Default, context);
 
-                    var index = await ServerStore.WriteDbAsync(context, name, json, null, dbDoc.Encrypted);
+                    var index = await ServerStore.WriteDbAsync(context, name, json, null);
                     await ServerStore.Cluster.WaitForIndexNotification(index);
 
                     ServerStore.NotificationCenter.Add(DatabaseChanged.Create(name, DatabaseChangeType.Put));

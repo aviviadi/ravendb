@@ -128,11 +128,11 @@ namespace Sparrow.Json
             bool lockTaken = false;
             try
             {
-                if (_disposed)
-                    return;
-
                 Monitor.TryEnter(this, ref lockTaken);
                 if (lockTaken == false)
+                    return;
+
+                if (_disposed)
                     return;
 
                 var now = DateTime.UtcNow;
@@ -292,21 +292,14 @@ namespace Sparrow.Json
 
         public void LowMemory()
         {
-            Interlocked.CompareExchange(ref LowMemoryFlag.LowMemoryState, 1, 0);
+            if (Interlocked.CompareExchange(ref LowMemoryFlag.LowMemoryState, 1, 0) != 0)
+                return;
             CleanNativeMemoryTimer(null);
         }
 
         public void LowMemoryOver()
         {
             Interlocked.CompareExchange(ref LowMemoryFlag.LowMemoryState, 0, 1);
-        }
-
-        public LowMemoryHandlerStatistics GetStats()
-        {
-            return new LowMemoryHandlerStatistics
-            {
-                Name = "JsonContextPool"
-            };
         }
     }
 }

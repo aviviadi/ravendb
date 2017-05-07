@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Sparrow;
 using Sparrow.Collections;
+using Sparrow.LowMemory;
 using Sparrow.Platform.Win32;
 using Sparrow.Utils;
 using Voron.Data;
@@ -217,7 +218,7 @@ namespace Voron.Impl
             _journal = env.Journal;
             _id = id;
             _freeSpaceHandling = freeSpaceHandling;
-            _allocator = context ?? new ByteStringContext();
+            _allocator = context ?? new ByteStringContext(LowMemoryFlag.None);
             _disposeAllocator = context == null;
             _pagerStates = new HashSet<PagerState>(ReferenceEqualityComparer<PagerState>.Default);
 
@@ -750,7 +751,7 @@ namespace Voron.Impl
                 ThrowAsyncCommitAlreadyCalled();
 
             // we have to check the state before we complete the transaction
-            // because that would change whatever we need to write to the journal
+            // because that would change whether we need to write to the journal
             var writeToJournalIsRequired = WriteToJournalIsRequired();
 
             CommitStage1_CompleteTransaction();

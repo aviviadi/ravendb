@@ -19,6 +19,7 @@ using Raven.Server.Documents;
 using Raven.Server.NotificationCenter;
 using Raven.Server.Rachis;
 using Raven.Server.NotificationCenter.Notifications;
+using Raven.Server.NotificationCenter.Notifications.Details;
 using Raven.Server.ServerWide.Commands;
 using Raven.Server.ServerWide.Context;
 using Raven.Server.Utils;
@@ -210,7 +211,8 @@ namespace Raven.Server.ServerWide
                     e.Message,
                     AlertType.NonDurableFileSystem,
                     NotificationSeverity.Warning,
-                    "NonDurable Error System");
+                    "NonDurable Error System",
+                    details: new WarningDetails(e.Details));
                 if (NotificationCenter.IsInitialized)
                 {
                     NotificationCenter.Add(alert);
@@ -294,6 +296,8 @@ namespace Raven.Server.ServerWide
                     DatabasesLandlord.ClusterOnDatabaseChanged(this, (db.Item1, 0));
                 }
             }
+
+            Task.Run(ClusterMaintanceSetupTask, ServerShutdown);
         }
 
         public IEnumerable<string> GetSecretKeysNames(TransactionOperationContext context)
@@ -695,15 +699,14 @@ namespace Raven.Server.ServerWide
             return ((now - maxLastWork).TotalMinutes > 5) || ((now - database.LastIdleTime).TotalMinutes > 10);
         }
 
-        public async Task<long> WriteDbAsync(TransactionOperationContext context, string dbId, BlittableJsonReaderObject dbDoc, long? etag, bool encrypted = false)
+        public async Task<long> WriteDbAsync(TransactionOperationContext context, string dbId, BlittableJsonReaderObject dbDoc, long? etag)
         {
             using (var putCmd = context.ReadObject(new DynamicJsonValue
             {
                 ["Type"] = nameof(AddDatabaseCommand),
                 [nameof(AddDatabaseCommand.Name)] = dbId,
                 [nameof(AddDatabaseCommand.Value)] = dbDoc,
-                [nameof(AddDatabaseCommand.Etag)] = etag,
-                [nameof(AddDatabaseCommand.Encrypted)] = encrypted
+                [nameof(AddDatabaseCommand.Etag)] = etag
             }, "put-cmd"))
             {
                 return await SendToLeaderAsync(putCmd);
