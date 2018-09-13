@@ -38,25 +38,24 @@ namespace Raven.Server.Documents.Handlers
             try
             {
                 var logger = LoggingSource.Instance.GetLogger<MergedInsertBulkCommand>(Database.Name);
-                IDisposable currentCtxReset = null, previousCtxReset = null;
-                try
+                using (ContextPool.AllocateOperationContext(out JsonOperationContext context))
+                using (var buffer = JsonOperationContext.ManagedPinnedBuffer.LongLivedInstance())
+                using (ContextPool.AllocateOperationContext(out JsonOperationContext docsCtx))
                 {
-                    using (ContextPool.AllocateOperationContext(out JsonOperationContext context))
-                    using (var buffer = JsonOperationContext.ManagedPinnedBuffer.LongLivedInstance())
+                    var requestBodyStream = RequestBodyStream();
+
+                    using (var parser = new BatchRequestParser.ReadMany(context, requestBodyStream, buffer, token))
                     {
-                        currentCtxReset = ContextPool.AllocateOperationContext(out JsonOperationContext docsCtx);
-                        var requestBodyStream = RequestBodyStream();
+                        await parser.Init();
 
-                        using (var parser = new BatchRequestParser.ReadMany(context, requestBodyStream, buffer, token))
+                        var array = new BatchRequestParser.CommandData[8];
+                        var numberOfCommands = 0;
+                        long totalSize = 0;
+                        while (true)
                         {
-                            await parser.Init();
-
-                            var array = new BatchRequestParser.CommandData[8];
-                            var numberOfCommands = 0;
-                            long totalSize = 0;
-                            while (true)
+                            using (ContextPool.AllocateOperationContext(out JsonOperationContext readCtx))
                             {
-                                var task = parser.MoveNext(docsCtx);
+                                var task = parser.MoveNext(readCtx);
                                 if (task == null)
                                     break;
 
@@ -67,27 +66,23 @@ namespace Raven.Server.Documents.Handlers
                                     // but don't batch too much anyway
                                     totalSize > 16 * Voron.Global.Constants.Size.Megabyte)
                                 {
-                                    using (ReplaceContextIfCurrentlyInUse(task, numberOfCommands, array))
+                                    await Database.TxMerger.Enqueue(new MergedInsertBulkCommand
                                     {
-                                        await Database.TxMerger.Enqueue(new MergedInsertBulkCommand
-                                        {
-                                            Commands = array,
-                                            NumberOfCommands = numberOfCommands,
-                                            Database = Database,
-                                            Logger = logger,
-                                            TotalSize = totalSize
-                                        });
-                                    }
+                                        Commands = array,
+                                        NumberOfCommands = numberOfCommands,
+                                        Database = Database,
+                                        Logger = logger,
+                                        TotalSize = totalSize
+                                    });
 
                                     progress.BatchCount++;
                                     progress.Processed += numberOfCommands;
-                                    progress.LastProcessedId = array[numberOfCommands-1].Id;
+                                    progress.LastProcessedId = array[numberOfCommands - 1].Id;
 
                                     onProgress(progress);
 
-                                    previousCtxReset?.Dispose();
-                                    previousCtxReset = currentCtxReset;
-                                    currentCtxReset = ContextPool.AllocateOperationContext(out docsCtx);
+                                    docsCtx.Reset();
+                                    docsCtx.Renew();
 
                                     numberOfCommands = 0;
                                     totalSize = 0;
@@ -100,32 +95,34 @@ namespace Raven.Server.Documents.Handlers
                                 totalSize += commandData.Document.Size;
                                 if (numberOfCommands >= array.Length)
                                     Array.Resize(ref array, array.Length * 2);
+
+                                // need to copy to stable location, because readCtx
+                                // will be gone the next loop, and docCtx buffers the data
+                                if (commandData.Document != null)
+                                    commandData.Document = commandData.Document.Clone(docsCtx);
                                 array[numberOfCommands++] = commandData;
                             }
-                            if (numberOfCommands > 0)
+                        }
+
+                        if (numberOfCommands > 0)
+                        {
+                            await Database.TxMerger.Enqueue(new MergedInsertBulkCommand
                             {
-                                await Database.TxMerger.Enqueue(new MergedInsertBulkCommand
-                                {
-                                    Commands = array,
-                                    NumberOfCommands = numberOfCommands,
-                                    Database = Database,
-                                    Logger = logger,
-                                    TotalSize = totalSize
-                                });
+                                Commands = array,
+                                NumberOfCommands = numberOfCommands,
+                                Database = Database,
+                                Logger = logger,
+                                TotalSize = totalSize
+                            });
 
-                                progress.BatchCount++;
-                                progress.Processed += numberOfCommands;
-                                progress.LastProcessedId = array[numberOfCommands-1].Id;
+                            progress.BatchCount++;
+                            progress.Processed += numberOfCommands;
+                            progress.LastProcessedId = array[numberOfCommands - 1].Id;
 
-                                onProgress(progress);
-                            }
+                            onProgress(progress);
                         }
                     }
-                }
-                finally
-                {
-                    currentCtxReset?.Dispose();
-                    previousCtxReset?.Dispose();
+                    
                 }
 
                 HttpContext.Response.StatusCode = (int)HttpStatusCode.Created;
@@ -140,28 +137,6 @@ namespace Raven.Server.Documents.Handlers
                 HttpContext.Response.Headers["Connection"] = "close";
                 throw new InvalidOperationException("Failed to process bulk insert " + progress, e);
             }
-        }
-
-        private IDisposable ReplaceContextIfCurrentlyInUse(Task<BatchRequestParser.CommandData> task, int numberOfCommands, BatchRequestParser.CommandData[] array)
-        {
-            if (task.IsCompleted)
-                return null;
-
-            var disposable = ContextPool.AllocateOperationContext(out JsonOperationContext tempCtx);
-            // the docsCtx is currently in use, so we 
-            // cannot pass it to the tx merger, we'll just
-            // copy the documents to a temporary ctx and 
-            // use that ctx instead. Copying the documents
-            // is safe, because they are immutables
-
-            for (int i = 0; i < numberOfCommands; i++)
-            {
-                if (array[i].Document != null)
-                {
-                    array[i].Document = array[i].Document.Clone(tempCtx);
-                }
-            }
-            return disposable;
         }
 
 

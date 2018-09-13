@@ -30,6 +30,9 @@
     <DefineConstants>$(DefineConstants);MEM_GUARD_STACK;VALIDATE</DefineConstants>
     <Optimize>true</Optimize>
   </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DefineConstants>TRACE;MEM_GUARD;</DefineConstants>
+  </PropertyGroup>
   <ItemGroup>
     <None Include="Sodium.tt">
       <Generator>TextTemplatingFileGenerator</Generator>

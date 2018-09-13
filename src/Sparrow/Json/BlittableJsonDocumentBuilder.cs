@@ -309,6 +309,11 @@ namespace Sparrow.Json
                         continue;
                     case ContinuationState.CompleteReadingPropertyValue:
                         // Register property position, name id (PropertyId) and type (object type and metadata)
+                        if (currentState.Properties==null)
+                        {
+                            System.Diagnostics.Debugger.Break();
+                            throw new Exception("currentState.Properties is null..");
+                        }
                         currentState.Properties.Add(new PropertyTag (
                             position: _writeToken.ValuePos,
                             type: (byte)_writeToken.WrittenToken,
