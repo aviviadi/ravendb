@@ -7,6 +7,7 @@ namespace Sparrow.Json.Parsing
 {
     public unsafe class UnmanagedJsonParser : IJsonParser
     {
+        public MemoryStream ms = new  MemoryStream();
         private static readonly byte[] NaN = { (byte)'N', (byte)'a', (byte)'N' };
         private static readonly byte[] PositiveInfinity =
         {

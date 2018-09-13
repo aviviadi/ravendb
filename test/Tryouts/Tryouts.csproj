@@ -8,6 +8,9 @@
     <PackageId>Tryouts</PackageId>
     <CodeAnalysisRuleSet>..\..\RavenDB.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DefineConstants>TRACE;DEBUG;NETCOREAPP;NETCOREAPP2_1;MEM_GUARD;VALIDATE</DefineConstants>
+  </PropertyGroup>
   <ItemGroup Condition="'$(OS)' == 'Windows_NT'">
     <Compile Include="..\..\src\CommonAssemblyInfo.Windows.cs" Link="Properties\CommonAssemblyInfo.Windows.cs" />
   </ItemGroup>

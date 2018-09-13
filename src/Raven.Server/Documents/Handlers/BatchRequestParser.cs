@@ -15,12 +15,14 @@ using Raven.Server.ServerWide;
 using Sparrow;
 using Sparrow.Json;
 using Sparrow.Json.Parsing;
+using Sparrow.Platform.Posix.macOS;
 using Sparrow.Utils;
 
 namespace Raven.Server.Documents.Handlers
 {
     public class BatchRequestParser
     {
+        
         public struct CommandData
         {
             public CommandType Type;
@@ -268,28 +270,60 @@ namespace Raven.Server.Documents.Handlers
 
             public Task<CommandData> MoveNext(JsonOperationContext ctx)
             {
-                if (_parser.Read())
+                try
                 {
-                    if (_state.CurrentTokenType == JsonParserToken.EndArray)
-                        return null;
+                    if (_parser.Read())
+                    {
+                        if (_state.CurrentTokenType == JsonParserToken.EndArray)
+                            return null;
 
-                    return ReadSingleCommand(ctx, _stream, _state, _parser, _buffer, _token);
+                        return ReadSingleCommand(ctx, _stream, _state, _parser, _buffer, _token);
+                    }
+
+                    return MoveNextUnlikely(ctx);
                 }
+                catch 
+                {
+                    var file = Path.GetTempFileName();
+                    using (var fs = File.Create(file))
+                    {
+                        _parser.ms.Position = 0;
+                        _parser.ms.CopyTo(fs);
+                    }
 
-                return MoveNextUnlikely(ctx);
+                    Console.WriteLine("Output written to: " + file);
+                    throw;
+                }
             }
 
             private async Task<CommandData> MoveNextUnlikely(JsonOperationContext ctx)
             {
-                do
+                try
                 {
-                    await RefillParserBuffer(_stream, _buffer, _parser, _token);
+                    do
+                    {
+                        await Task.Delay(100);
+                        await RefillParserBuffer(_stream, _buffer, _parser, _token);
 
-                } while (_parser.Read() == false);
-                if (_state.CurrentTokenType == JsonParserToken.EndArray)
-                    return new CommandData { Type = CommandType.None };
+                    } while (_parser.Read() == false);
+                    if (_state.CurrentTokenType == JsonParserToken.EndArray)
+                        return new CommandData { Type = CommandType.None };
 
-                return await ReadSingleCommand(ctx, _stream, _state, _parser, _buffer, _token);
+                    return await ReadSingleCommand(ctx, _stream, _state, _parser, _buffer, _token);
+                }
+                catch 
+                {
+                    var file = Path.GetTempFileName();
+                    using (var fs = File.Create(file))
+                    {
+                        _parser.ms.Position = 0;
+                        _parser.ms.CopyTo(fs);
+                    }
+
+                    Console.WriteLine("Output written to: " + file);
+                    throw;
+                    throw;
+                }
             }
         }
 
@@ -580,6 +614,8 @@ namespace Raven.Server.Documents.Handlers
             throw new InvalidOperationException($"Attachment PUT command must have a '{nameof(CommandData.Name)}' property");
         }
 
+        
+        
         private static async Task<BlittableJsonReaderObject> ReadJsonObject(JsonOperationContext ctx, Stream stream, string id, UnmanagedJsonParser parser,
             JsonParserState state, JsonOperationContext.ManagedPinnedBuffer buffer, CancellationToken token)
         {
@@ -848,6 +884,7 @@ namespace Raven.Server.Documents.Handlers
             var read = await stream.ReadAsync(buffer.Buffer.Array, buffer.Buffer.Offset, buffer.Buffer.Count, token).WithCancellation(token);
             if (read == 0)
                 ThrowUnexpectedEndOfStream();
+            parser.ms.Write(buffer.Buffer.Array, buffer.Buffer.Offset, read);
             parser.SetBuffer(buffer, 0, read);
         }
 
