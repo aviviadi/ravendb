@@ -199,6 +199,7 @@ namespace Sparrow.Json
                 Context.InPoolSince = DateTime.UtcNow;
 
                 Parent.Push(Context);
+                // Context.Dispose();
             }
 
         }

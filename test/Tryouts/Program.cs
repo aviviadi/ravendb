@@ -30,10 +30,7 @@ namespace Tryouts
     {
         public static async Task Main()
         {
-            Console.WriteLine("Press any key,...");
-            Console.Out.Flush();
-            Console.ReadKey();
-            
+           
                for (var i = 0; i < 100; i++)
                 {
                     try

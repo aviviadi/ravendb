@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using Sparrow;
 using System.Net;
 using System.Threading;
@@ -10,10 +9,9 @@ using Raven.Client.Documents.Commands.Batches;
 using Raven.Client.Documents.Operations;
 using Raven.Server.Routing;
 using Raven.Server.ServerWide.Context;
-using Raven.Server.Smuggler.Documents;
 using Sparrow.Json;
-using Sparrow.Json.Parsing;
 using Sparrow.Logging;
+using Voron.Impl.Backup;
 
 namespace Raven.Server.Documents.Handlers
 {
@@ -32,6 +30,9 @@ namespace Raven.Server.Documents.Handlers
             );
         }
 
+        private static string f = Guid.NewGuid().ToString();
+        public static int count;
+
         private async Task<IOperationResult> DoBulkInsert(Action<IOperationProgress> onProgress, CancellationToken token)
         {
             var progress = new BulkInsertProgress();
@@ -43,86 +44,111 @@ namespace Raven.Server.Documents.Handlers
                 using (ContextPool.AllocateOperationContext(out JsonOperationContext docsCtx))
                 {
                     var requestBodyStream = RequestBodyStream();
+                    var ms = new MemoryStream();
+                    requestBodyStream.CopyTo(ms);
+                    ms.Position = 0;
 
-                    using (var parser = new BatchRequestParser.ReadMany(context, requestBodyStream, buffer, token))
+                    
+                    try
                     {
-                        await parser.Init();
 
-                        var array = new BatchRequestParser.CommandData[8];
-                        var numberOfCommands = 0;
-                        long totalSize = 0;
-                        while (true)
+                        using (var parser = new BatchRequestParser.ReadMany(context, ms, buffer, token))
                         {
-                            using (ContextPool.AllocateOperationContext(out JsonOperationContext readCtx))
+                            await parser.Init();
+
+                            var array = new BatchRequestParser.CommandData[8];
+                            var numberOfCommands = 0;
+                            long totalSize = 0;
+                            while (true)
                             {
-                                var task = parser.MoveNext(readCtx);
-                                if (task == null)
-                                    break;
-
-                                token.ThrowIfCancellationRequested();
-
-                                // if we are going to wait on the network, flush immediately
-                                if ((task.IsCompleted == false && numberOfCommands > 0) ||
-                                    // but don't batch too much anyway
-                                    totalSize > 16 * Voron.Global.Constants.Size.Megabyte)
+                                using (ContextPool.AllocateOperationContext(out JsonOperationContext readCtx))
                                 {
-                                    await Database.TxMerger.Enqueue(new MergedInsertBulkCommand
+                                    var task = parser.MoveNext(readCtx);
+                                    if (task == null)
+                                        break;
+
+                                    token.ThrowIfCancellationRequested();
+
+                                    // if we are going to wait on the network, flush immediately
+                                    // if we are going to wait on the network, flush immediately
+                                    /*if ((task.IsCompleted == false && numberOfCommands > 0) ||
+                                        // but don't batch too much anyway
+                                        totalSize > 16 * Voron.Global.Constants.Size.Megabyte)*/
+                                    if(numberOfCommands > 0)
                                     {
-                                        Commands = array,
-                                        NumberOfCommands = numberOfCommands,
-                                        Database = Database,
-                                        Logger = logger,
-                                        TotalSize = totalSize
-                                    });
+                                        await Database.TxMerger.Enqueue(new MergedInsertBulkCommand
+                                        {
+                                            Commands = array,
+                                            NumberOfCommands = numberOfCommands,
+                                            Database = Database,
+                                            Logger = logger,
+                                            TotalSize = totalSize
+                                        });
 
-                                    progress.BatchCount++;
-                                    progress.Processed += numberOfCommands;
-                                    progress.LastProcessedId = array[numberOfCommands - 1].Id;
+                                        progress.BatchCount++;
+                                        progress.Processed += numberOfCommands;
+                                        progress.LastProcessedId = array[numberOfCommands - 1].Id;
 
-                                    onProgress(progress);
+                                        onProgress(progress);
 
-                                    docsCtx.Reset();
-                                    docsCtx.Renew();
+                                        docsCtx.Reset();
+                                        docsCtx.Renew();
 
-                                    numberOfCommands = 0;
-                                    totalSize = 0;
+                                        numberOfCommands = 0;
+                                        totalSize = 0;
+                                    }
+
+                                    var commandData = await task;
+                                    if (commandData.Type == CommandType.None)
+                                        break;
+
+                                    totalSize += commandData.Document.Size;
+                                    if (numberOfCommands >= array.Length)
+                                        Array.Resize(ref array, array.Length * 2);
+
+                                    // need to copy to stable location, because readCtx
+                                    // will be gone the next loop, and docCtx buffers the data
+                                    if (commandData.Document != null)
+                                        commandData.Document = commandData.Document.Clone(docsCtx);
+                                    array[numberOfCommands++] = commandData;
                                 }
+                            }
 
-                                var commandData = await task;
-                                if (commandData.Type == CommandType.None)
-                                    break;
+                            if (numberOfCommands > 0)
+                            {
+                                await Database.TxMerger.Enqueue(new MergedInsertBulkCommand
+                                {
+                                    Commands = array,
+                                    NumberOfCommands = numberOfCommands,
+                                    Database = Database,
+                                    Logger = logger,
+                                    TotalSize = totalSize
+                                });
 
-                                totalSize += commandData.Document.Size;
-                                if (numberOfCommands >= array.Length)
-                                    Array.Resize(ref array, array.Length * 2);
+                                progress.BatchCount++;
+                                progress.Processed += numberOfCommands;
+                                progress.LastProcessedId = array[numberOfCommands - 1].Id;
 
-                                // need to copy to stable location, because readCtx
-                                // will be gone the next loop, and docCtx buffers the data
-                                if (commandData.Document != null)
-                                    commandData.Document = commandData.Document.Clone(docsCtx);
-                                array[numberOfCommands++] = commandData;
+                                onProgress(progress);
                             }
                         }
-
-                        if (numberOfCommands > 0)
-                        {
-                            await Database.TxMerger.Enqueue(new MergedInsertBulkCommand
-                            {
-                                Commands = array,
-                                NumberOfCommands = numberOfCommands,
-                                Database = Database,
-                                Logger = logger,
-                                TotalSize = totalSize
-                            });
-
-                            progress.BatchCount++;
-                            progress.Processed += numberOfCommands;
-                            progress.LastProcessedId = array[numberOfCommands - 1].Id;
-
-                            onProgress(progress);
-                        }
                     }
-                    
+                    catch (Exception e)
+                    {                        
+                        ms.Position = 0;
+                        var filename = "/tmp/" + Guid.NewGuid() + ".txt";
+                        Console.WriteLine("ZZ Filename is " + filename);
+                        Console.Out.Flush();
+                        FileStream fs = new FileStream(filename, FileMode.Create, FileAccess.ReadWrite);
+                        ms.CopyTo(fs);
+                        fs.Flush();
+                        fs.Dispose();
+                        Console.WriteLine("Written " + filename);
+                        Console.Out.Flush();
+                        Console.ReadKey();
+                        throw;
+                    }
+
                 }
 
                 HttpContext.Response.StatusCode = (int)HttpStatusCode.Created;
@@ -140,14 +166,14 @@ namespace Raven.Server.Documents.Handlers
         }
 
 
-        public class MergedInsertBulkCommand : TransactionOperationsMerger.MergedTransactionCommand
+        private class MergedInsertBulkCommand : TransactionOperationsMerger.MergedTransactionCommand
         {
             public Logger Logger;
             public DocumentDatabase Database;
             public BatchRequestParser.CommandData[] Commands;
             public int NumberOfCommands;
             public long TotalSize;
-            protected override int ExecuteCmd(DocumentsOperationContext context)
+            public override int Execute(DocumentsOperationContext context)
             {
                 for (int i = 0; i < NumberOfCommands; i++)
                 {
@@ -185,31 +211,6 @@ namespace Raven.Server.Documents.Handlers
                 }
                 return NumberOfCommands;
             }
-
-            public override TransactionOperationsMerger.IReplayableCommandDto<TransactionOperationsMerger.MergedTransactionCommand> ToDto(JsonOperationContext context)
-            {
-                return new MergedInsertBulkCommandDto
-                {
-                    Commands = Commands.Take(NumberOfCommands).ToArray()
-                };
-            }
-        }
-    }
-
-    public class MergedInsertBulkCommandDto : TransactionOperationsMerger.IReplayableCommandDto<BulkInsertHandler.MergedInsertBulkCommand>
-    {
-        public BatchRequestParser.CommandData[] Commands { get; set; }
-
-        public BulkInsertHandler.MergedInsertBulkCommand ToCommand(DocumentsOperationContext context, DocumentDatabase database)
-        {
-            return new BulkInsertHandler.MergedInsertBulkCommand
-            {
-                NumberOfCommands = Commands.Length,
-                TotalSize = Commands.Sum(c => c.Document.Size),
-                Commands = Commands,
-                Database = database,
-                Logger = LoggingSource.Instance.GetLogger<DatabaseDestination>(database.Name)
-            };
         }
     }
 }

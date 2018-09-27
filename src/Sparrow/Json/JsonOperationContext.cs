@@ -830,7 +830,10 @@ namespace Sparrow.Json
         private void EnsureNotDisposed()
         {
             if (Disposed)
+            {
                 ThrowObjectDisposed();
+                Console.WriteLine(Environment.StackTrace);
+            }
         }
 
         private ValueTask<BlittableJsonReaderObject> ParseToMemoryAsync(Stream stream, string documentId, BlittableJsonDocumentBuilder.UsageMode mode, CancellationToken? token = null)

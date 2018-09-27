@@ -18,6 +18,7 @@ using Sparrow.Json;
 using Sparrow.Json.Parsing;
 using Sparrow.Platform.Posix.macOS;
 using Sparrow.Utils;
+using Voron.Impl.Backup;
 
 namespace Raven.Server.Documents.Handlers
 {
@@ -284,7 +285,7 @@ namespace Raven.Server.Documents.Handlers
 
                     return MoveNextUnlikely(ctx);
                 }
-                catch 
+                catch (Exception e)
                 {
                     var file = Path.GetTempFileName();
                     using (var fs = File.Create(file))
@@ -293,7 +294,7 @@ namespace Raven.Server.Documents.Handlers
                         _parser.ms.CopyTo(fs);
                     }
 
-                    Console.WriteLine("Output written to: " + file);
+                    Console.WriteLine("Output written to: " + file + Environment.NewLine + e);
                     throw;
                 }
             }
@@ -304,7 +305,6 @@ namespace Raven.Server.Documents.Handlers
                 {
                     do
                     {
-                        await Task.Delay(100);
                         await RefillParserBuffer(_stream, _buffer, _parser, _token);
 
                     } while (_parser.Read() == false);
@@ -313,7 +313,7 @@ namespace Raven.Server.Documents.Handlers
 
                     return await ReadSingleCommand(ctx, _stream, _state, _parser, _buffer, _token);
                 }
-                catch 
+                catch (Exception e)
                 {
                     var file = Path.GetTempFileName();
                     using (var fs = File.Create(file))
@@ -322,9 +322,29 @@ namespace Raven.Server.Documents.Handlers
                         _parser.ms.CopyTo(fs);
                     }
 
-                    Console.WriteLine("Output written to: " + file);
-                    throw;
-                    throw;
+                    Console.WriteLine("Output written to2: " + file + Environment.NewLine + e);
+                    if (!(_stream is MemoryStream))
+                    {
+                        Console.WriteLine("Not ms!!!!!");
+                        Console.Out.Flush();
+                    }
+                    else
+                    {
+                        var ms = ((MemoryStream)_stream);
+                        ms.Position = 0;
+                        var filename = "/tmp/" + Guid.NewGuid() + ".txt";
+                        Console.WriteLine("Filename is " + filename);
+                        Console.Out.Flush();
+                        FileStream fs = new FileStream(filename, FileMode.Create, FileAccess.ReadWrite);
+                        ms.CopyTo(fs);
+                        fs.Flush();
+                        fs.Dispose();
+                        Console.WriteLine("Written " + filename);
+                        Console.Out.Flush();
+                    }
+
+                    Console.ReadKey();
+                    throw;                    
                 }
             }
         }

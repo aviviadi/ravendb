@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -95,31 +96,79 @@ namespace Raven.Client.Http
 
         public virtual async Task<ResponseDisposeHandling> ProcessResponse(JsonOperationContext context, HttpCache cache, HttpResponseMessage response, string url)
         {
-            if (ResponseType == RavenCommandResponseType.Empty || response.StatusCode == HttpStatusCode.NoContent)
-                return ResponseDisposeHandling.Automatic;
+            try
+            {
+                if (ResponseType == RavenCommandResponseType.Empty || response.StatusCode == HttpStatusCode.NoContent)
+                    return ResponseDisposeHandling.Automatic;
+            }
+            catch (OutOfMemoryException e)
+            {
+                Debugger.Break();
+            }
 
+            try
+            {
             using (var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
             {
+                try
+                {
                 if (ResponseType == RavenCommandResponseType.Object)
                 {
                     var contentLength = response.Content.Headers.ContentLength;
                     if (contentLength.HasValue && contentLength == 0)
                         return ResponseDisposeHandling.Automatic;
-
+                    BlittableJsonReaderObject json = null;
+                    try
+                    {
                     // we intentionally don't dispose the reader here, we'll be using it
                     // in the command, any associated memory will be released on context reset
-                    var json = await context.ReadForMemoryAsync(stream, "response/object").ConfigureAwait(false);
+                    json = await context.ReadForMemoryAsync(stream, "response/object").ConfigureAwait(false);
+                    }
+                    catch (OutOfMemoryException e)
+                    {
+                        Debugger.Break();
+                    }
+                    try
+                    {
                     if (cache != null) //precaution
                     {
                         CacheResponse(cache, url, response, json);
                     }
+                    }
+                    catch (OutOfMemoryException e)
+                    {
+                        Debugger.Break();
+                    }
+                    try
+                    {
                     SetResponse(context, json, fromCache: false);
+                    }
+                    catch (OutOfMemoryException e)
+                    {
+                        Debugger.Break();
+                    }
                     return ResponseDisposeHandling.Automatic;
                 }
-
+                }
+                catch (OutOfMemoryException e)
+                {
+                    Debugger.Break();
+                }
+                try
+                {
                 // We do not cache the stream response.
                 using (var uncompressedStream = await RequestExecutor.ReadAsStreamUncompressedAsync(response).ConfigureAwait(false))
                     SetResponseRaw(response, uncompressedStream, context);
+                }
+                catch (OutOfMemoryException e)
+                {
+                    Debugger.Break();
+                }
+            }
+            }
+            catch (OutOfMemoryException e)
+            {
+                Debugger.Break();
             }
             return ResponseDisposeHandling.Automatic;
         }
