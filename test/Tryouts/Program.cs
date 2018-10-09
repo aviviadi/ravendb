@@ -1,28 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using FastTests;
-using FastTests.Server.Documents.Queries.Parser;
-using FastTests.Voron.Backups;
-using FastTests.Voron.Compaction;
-using Orders;
-using RachisTests.DatabaseCluster;
-using Raven.Client.Documents;
-using Raven.Client.Documents.Indexes;
-using Raven.Client.Documents.Operations.Indexes;
-using Raven.Client.Documents.Queries;
-using Raven.Tests.Core.Utils.Entities;
-using SlowTests.Authentication;
-using SlowTests.Bugs;
-using SlowTests.Bugs.MapRedue;
-using SlowTests.Client;
-using SlowTests.Client.Attachments;
-using SlowTests.Issues;
-using SlowTests.MailingList;
-using Sparrow.Logging;
-using StressTests.Client.Attachments;
-using Xunit;
+using Raven.Server.Documents.Handlers;
+using Sparrow.Json;
 
 namespace Tryouts
 {
@@ -30,35 +12,75 @@ namespace Tryouts
     {
         public static async Task Main()
         {
-           
-               for (var i = 0; i < 100; i++)
+
+            var pool = new JsonContextPool();
+            
+            Console.WriteLine("Starting...");
+            var filebytes = File.ReadAllBytes("/home/cesar/Sources/tmpcommand.txt");
+            for (var bl = 0; bl < 1000; bl++) 
+            {
+                if (bl % 10 == 0)
                 {
-                    try
+                  Console.WriteLine("\rbl =  " + bl + "  ...  ");
+                  Console.Out.Flush();
+                }
+
+                const int numOfTasks = 12;
+                var tasks = new Task[numOfTasks];
+                for (int i = 0; i < numOfTasks; i++)
+                {                    
+                    var k = i;
+
+                    tasks[i] = Task.Run(async ()=>
                     {
-                        var tasks = new Task[4];
-                        var tests = Enumerable.Range(0, tasks.Length).Select(x => new SlowTests.SlowTests.Issues.RavenDB_2812()).ToArray();
-
-                        for (var j = 0; j < tasks.Length; j++)
+                        for (int yy=0; yy < 6; yy++)
                         {
-                            var k = j;
-                            tasks[j] = Task.Run(async () => await tests[k].ShouldProperlyPageResults());
+                            var buffer = JsonOperationContext.ManagedPinnedBuffer.RawNew();
+                            using(var context = JsonOperationContext.ShortTermSingleUse())
+                            {
+                                MemoryStream ms = new MemoryStream(filebytes);
+
+                                using (var parser = new BatchRequestParser.ReadMany(context, ms, buffer, new System.Threading.CancellationToken()))
+                                {
+                                    await parser.Init();
+                                    for(int j=0; j<50; j++)
+                                    {
+                                        var doc = await parser.MoveNext(context);
+                                        
+                                        if (doc.Document.TryGetMember("Name", out var name) == false)
+                                        {
+                                            Console.WriteLine("Can't get Name");
+                                            Console.Out.Flush();
+                                        }
+                                        else
+                                        {
+                                            if (!name.ToString().Equals("user/"+ j))
+                                            {
+                                                Console.WriteLine("**************** name == " + name + " while expected == " + "user/"+ j);
+                                                Console.Out.Flush();
+                                            }
+
+                                        }
+                                    }
+                                }
+                            }
                         }
-
-                        await Task.WhenAll(tasks);
-                        for (var j = 0; j < tasks.Length; j++)
-                        {
-                            tests[j].Dispose();
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine(e);
-
-                    }
-
-                    Console.WriteLine(i);
+                    });
+                }
+                try 
+                {
+                    Task.WaitAll(tasks);
+                }
+                catch(Exception e)
+                {
+                  var ei = e;
+                  while(ei != null){
+                      System.Console.WriteLine(ei.Message);  
+                      ei = ei.InnerException;
+                  }
+                  throw;
                 }
             }
         }
     }
-
+}

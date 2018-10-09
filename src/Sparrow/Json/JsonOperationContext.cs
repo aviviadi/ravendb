@@ -29,6 +29,7 @@ namespace Sparrow.Json
     /// </summary>
     public class JsonOperationContext : PooledItem
     {
+        public List<string> debugCount;
         private int _generation;
         public const int InitialStreamSize = 4096;
         private const int MaxInitialStreamSize = 16 * 1024 * 1024;
@@ -117,7 +118,16 @@ namespace Sparrow.Json
             public const int Size =  32 * Constants.Size.Kilobyte;
 
             internal BufferSegment BufferInstance;
-            public ArraySegment<byte> Buffer;
+            ArraySegment<byte> _b;
+            public ArraySegment<byte> Buffer {
+                set { _b = value;}
+                get {
+                    // if(_b.Array == null){
+                    //     System.Console.WriteLine(Environment.StackTrace);
+                    // }
+                    return _b;
+                }
+            }
             public int Length;
             public int Valid, Used;
             public byte* Pointer;
@@ -144,20 +154,23 @@ namespace Sparrow.Json
                 if (bufferBefore != null)
                 {
                     if (bufferBefore.Count == LargeBufferSize)
+                    {
                         _largeBufferSegments.Free(bufferBefore);
+                       // System.Console.WriteLine("Returning large buffer: " + System.Environment.StackTrace);
+                    }
                     else
                         _smallBufferSegments.Free(bufferBefore);
                 }
 
-                _pinnedBufferPool.Free(this);
+                _pinnedBufferPool.Free(new ManagedPinnedBuffer());
                 
             }
 
-            ~ManagedPinnedBuffer()
-            {
-                if (_handle.IsAllocated)
-                    _handle.Free();
-            }
+            // ~ManagedPinnedBuffer()
+            // {
+            //     if (_handle.IsAllocated)
+            //         _handle.Free();
+            // }
 
             public (IDisposable ReleaseBuffer, ManagedPinnedBuffer Buffer) Clone<T>(JsonContextPoolBase<T> pool)
                 where T : JsonOperationContext
@@ -255,6 +268,19 @@ namespace Sparrow.Json
                 public byte[] Array;
                 public int Offset;
                 public int Count;
+            }
+
+            public static ManagedPinnedBuffer RawNew(){
+                var mbp = new ManagedPinnedBuffer();
+                var buffer = new byte[LargeBufferSize];
+                var handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
+                mbp.Init(new BufferSegment{
+                    Array = buffer,
+                    Offset = 0,
+                    Count = buffer.Length
+                }, (byte*)handle.AddrOfPinnedObject(), handle);
+
+               return mbp;
             }
 
             public static ManagedPinnedBuffer LongLivedInstance()
@@ -930,6 +956,7 @@ namespace Sparrow.Json
         {
             if (_tempBuffer != null && _tempBuffer.Address != null)
             {
+                Memory.Set(_tempBuffer.Address, 0xAA, _tempBuffer.SizeInBytes);
                 _arenaAllocator.Return(_tempBuffer);
                 _tempBuffer = null;
             }
