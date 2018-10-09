@@ -241,7 +241,7 @@ namespace Raven.Server.Documents.Handlers
         public class ReadMany : IDisposable
         {
             private readonly Stream _stream;
-            private readonly UnmanagedJsonParser _parser;
+            public readonly UnmanagedJsonParser _parser;
             private readonly JsonOperationContext.ManagedPinnedBuffer _buffer;
             private readonly JsonParserState _state;
             private readonly CancellationToken _token;
@@ -282,26 +282,26 @@ namespace Raven.Server.Documents.Handlers
 
                         return ReadSingleCommand(ctx, _stream, _state, _parser, _buffer, _token);
                     }
+                }
+                catch(Exception e)
+                {
+                    Console.WriteLine("REGULAR *************");
+                    throw;                    
+                }
 
+                try
+                {
                     return MoveNextUnlikely(ctx);
                 }
-                catch (Exception e)
+                catch(Exception e)
                 {
-                    var file = Path.GetTempFileName();
-                    using (var fs = File.Create(file))
-                    {
-                        _parser.ms.Position = 0;
-                        _parser.ms.CopyTo(fs);
-                    }
-
-                    Console.WriteLine("Output written to: " + file + Environment.NewLine + e);
+                    Console.WriteLine("UNLIKELY *************");
                     throw;
-                }
+                }                                                   
             }
 
             private async Task<CommandData> MoveNextUnlikely(JsonOperationContext ctx)
             {
-                try
                 {
                     do
                     {
@@ -313,39 +313,7 @@ namespace Raven.Server.Documents.Handlers
 
                     return await ReadSingleCommand(ctx, _stream, _state, _parser, _buffer, _token);
                 }
-                catch (Exception e)
-                {
-                    var file = Path.GetTempFileName();
-                    using (var fs = File.Create(file))
-                    {
-                        _parser.ms.Position = 0;
-                        _parser.ms.CopyTo(fs);
-                    }
-
-                    Console.WriteLine("Output written to2: " + file + Environment.NewLine + e);
-                    if (!(_stream is MemoryStream))
-                    {
-                        Console.WriteLine("Not ms!!!!!");
-                        Console.Out.Flush();
-                    }
-                    else
-                    {
-                        var ms = ((MemoryStream)_stream);
-                        ms.Position = 0;
-                        var filename = "/tmp/" + Guid.NewGuid() + ".txt";
-                        Console.WriteLine("Filename is " + filename);
-                        Console.Out.Flush();
-                        FileStream fs = new FileStream(filename, FileMode.Create, FileAccess.ReadWrite);
-                        ms.CopyTo(fs);
-                        fs.Flush();
-                        fs.Dispose();
-                        Console.WriteLine("Written " + filename);
-                        Console.Out.Flush();
-                    }
-
-                    Console.ReadKey();
-                    throw;                    
-                }
+               
             }
         }
 
@@ -358,6 +326,11 @@ namespace Raven.Server.Documents.Handlers
             JsonOperationContext.ManagedPinnedBuffer buffer,
             CancellationToken token)
         {
+
+
+
+try{
+
             var commandData = new CommandData();
             if (state.CurrentTokenType != JsonParserToken.StartObject)
             {
@@ -368,6 +341,8 @@ namespace Raven.Server.Documents.Handlers
             {
                 while (parser.Read() == false)
                     await RefillParserBuffer(stream, buffer, parser, token);
+
+//                Console.WriteLine(Encoding.UTF8.GetString(buffer.Buffer.Array, 0, buffer.Buffer.Count));
 
                 if (state.CurrentTokenType == JsonParserToken.EndObject)
                     break;
@@ -385,7 +360,7 @@ namespace Raven.Server.Documents.Handlers
                         {
                             ThrowUnexpectedToken(JsonParserToken.String, state);
                         }
-                        commandData.Type = GetCommandType(state, ctx);
+                        commandData.Type = GetCommandType(state, null);
                         break;
                     case CommandPropertyName.Id:
                         while (parser.Read() == false)
@@ -587,6 +562,12 @@ namespace Raven.Server.Documents.Handlers
             }
 
             return commandData;
+}
+catch(Exception ee)
+{
+    System.Console.WriteLine("HERE: " + ee);
+    throw;
+}
         }
 
         private static CommandData[] IncreaseSizeOfCommandsBuffer(int index, CommandData[] cmds)
@@ -797,7 +778,7 @@ namespace Raven.Server.Documents.Handlers
             }
         }
 
-        private static unsafe CommandType GetCommandType(JsonParserState state, JsonOperationContext ctx)
+        private static unsafe CommandType GetCommandType(JsonParserState state, JsonOperationContext ctx = null)
         {
             // here we confirm that the value is matching our expectation, in order to save CPU instructions
             // we compare directly against the precomputed values
@@ -891,7 +872,7 @@ namespace Raven.Server.Documents.Handlers
         private static unsafe void ThrowInvalidProperty(JsonParserState state, JsonOperationContext ctx)
         {
             throw new InvalidOperationException("Invalid property name: " +
-                                                ctx.AllocateStringValue(null, state.StringBuffer, state.StringSize));
+                                                ctx?.AllocateStringValue(null, state.StringBuffer, state.StringSize));
         }
 
         private static void ThrowUnexpectedToken(JsonParserToken jsonParserToken, JsonParserState state)
@@ -899,14 +880,26 @@ namespace Raven.Server.Documents.Handlers
             throw new InvalidOperationException("Expected " + jsonParserToken + " , but got " + state.CurrentTokenType);
         }
 
-        private static async Task RefillParserBuffer(Stream stream, JsonOperationContext.ManagedPinnedBuffer buffer, UnmanagedJsonParser parser, CancellationToken token = default)
+public static byte[] Expected;
+        public static async Task RefillParserBuffer(Stream stream, JsonOperationContext.ManagedPinnedBuffer buffer, UnmanagedJsonParser parser, CancellationToken token = default)
         {
+            long pos = -1;
+            if(stream is MemoryStream ms)
+                pos = ms.Position;
             // Although we using here WithCancellation and passing the token,
             // the stream will stay open even after the cancellation until the entire server will be disposed.
             var read = await stream.ReadAsync(buffer.Buffer.Array, buffer.Buffer.Offset, buffer.Buffer.Count, token).WithCancellation(token);
             if (read == 0)
                 ThrowUnexpectedEndOfStream();
-            parser.ms.Write(buffer.Buffer.Array, buffer.Buffer.Offset, read);
+            if(pos != -1 && Expected != null){
+                for(var i =0; i < read; i++){
+                    if(buffer.Buffer.Array[i + buffer.Buffer.Offset] != Expected[i + pos])
+                    {
+                        throw new Exception("Mismatch read!!!!");
+                    }
+                }
+            }
+
             parser.SetBuffer(buffer, 0, read);
         }
 

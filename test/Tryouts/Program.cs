@@ -1,7 +1,7 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
+using System.Security.Cryptography;
+using System.Threading;
 using System.Threading.Tasks;
 using Raven.Server.Documents.Handlers;
 using Sparrow.Json;
@@ -12,54 +12,65 @@ namespace Tryouts
     {
         public static async Task Main()
         {
+            if (GC.TryStartNoGCRegion(1_000_000_000, 1_000_000_000) == false)
+                Console.WriteLine("Failed To Suppress GC");
+            JsonContextPool pool = new JsonContextPool();
 
-            var pool = new JsonContextPool();
-            
             Console.WriteLine("Starting...");
-            var filebytes = File.ReadAllBytes("/home/cesar/Sources/tmpcommand.txt");
-            for (var bl = 0; bl < 1000; bl++) 
+            byte[] filebytes = File.ReadAllBytes("/home/cesar/Sources/tmpcommand.txt");
+
+            BatchRequestParser.Expected = filebytes;
+            string md5 = Convert.ToBase64String(MD5.Create().ComputeHash(filebytes));
+
+            for (int bl = 0; bl < 1000; bl++)
             {
                 if (bl % 10 == 0)
                 {
-                  Console.WriteLine("\rbl =  " + bl + "  ...  ");
-                  Console.Out.Flush();
+                    Console.WriteLine("\rbl =  " + bl + "  ...  ");
+                    Console.Out.Flush();
                 }
 
                 const int numOfTasks = 12;
-                var tasks = new Task[numOfTasks];
+                Task[] tasks = new Task[numOfTasks];
                 for (int i = 0; i < numOfTasks; i++)
-                {                    
-                    var k = i;
+                {
+                    int k = i;
 
-                    tasks[i] = Task.Run(async ()=>
+                    tasks[i] = Task.Run(async () =>
                     {
-                        for (int yy=0; yy < 6; yy++)
+                        for (int yy = 0; yy < 6; yy++)
                         {
-                            var buffer = JsonOperationContext.ManagedPinnedBuffer.RawNew();
-                            using(var context = JsonOperationContext.ShortTermSingleUse())
+                            JsonOperationContext.ManagedPinnedBuffer buffer = JsonOperationContext.ManagedPinnedBuffer.RawNew();
+                            using (JsonOperationContext context = JsonOperationContext.ShortTermSingleUse())
                             {
                                 MemoryStream ms = new MemoryStream(filebytes);
 
-                                using (var parser = new BatchRequestParser.ReadMany(context, ms, buffer, new System.Threading.CancellationToken()))
+                                string md5_2 = Convert.ToBase64String(MD5.Create().ComputeHash(filebytes));
+                                if (md5_2 != md5)
+                                {
+                                    Console.WriteLine("WTH?????!!!!");
+                                    Console.Out.Flush();
+                                }
+
+                                using (BatchRequestParser.ReadMany parser = new BatchRequestParser.ReadMany(context, ms, buffer, new CancellationToken()))
                                 {
                                     await parser.Init();
-                                    for(int j=0; j<50; j++)
+                                    for (int j = 0; j < 50; j++)
                                     {
-                                        var doc = await parser.MoveNext(context);
-                                        
-                                        if (doc.Document.TryGetMember("Name", out var name) == false)
+                                        BatchRequestParser.CommandData doc = await parser.MoveNext(context);
+
+                                        if (doc.Document.TryGetMember("Name", out object name) == false)
                                         {
                                             Console.WriteLine("Can't get Name");
                                             Console.Out.Flush();
                                         }
                                         else
                                         {
-                                            if (!name.ToString().Equals("user/"+ j))
+                                            if (!name.ToString().Equals("user/" + j))
                                             {
-                                                Console.WriteLine("**************** name == " + name + " while expected == " + "user/"+ j);
+                                                Console.WriteLine("**************** name == " + name + " while expected == " + "user/" + j);
                                                 Console.Out.Flush();
                                             }
-
                                         }
                                     }
                                 }
@@ -67,18 +78,28 @@ namespace Tryouts
                         }
                     });
                 }
-                try 
+
+                try
                 {
                     Task.WaitAll(tasks);
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
-                  var ei = e;
-                  while(ei != null){
-                      System.Console.WriteLine(ei.Message);  
-                      ei = ei.InnerException;
-                  }
-                  throw;
+                    Exception ei = e;
+                    while (ei != null)
+                    {
+                        Console.WriteLine(ei.Message);
+                        ei = ei.InnerException;
+                    }
+
+                    string md5_2 = Convert.ToBase64String(MD5.Create().ComputeHash(filebytes));
+                    if (md5_2 != md5)
+                    {
+                        Console.WriteLine("WT                    ?????!!!!");
+                        Console.Out.Flush();
+                    }
+
+                    throw;
                 }
             }
         }

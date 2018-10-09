@@ -7,7 +7,6 @@ namespace Sparrow.Json.Parsing
 {
     public unsafe class UnmanagedJsonParser : IJsonParser
     {
-        public MemoryStream ms = new  MemoryStream();
         private static readonly byte[] NaN = { (byte)'N', (byte)'a', (byte)'N' };
         private static readonly byte[] PositiveInfinity =
         {
@@ -21,7 +20,7 @@ namespace Sparrow.Json.Parsing
         public static readonly byte[] Utf8Preamble = Encoding.UTF8.GetPreamble();
 
         private readonly string _debugTag;
-        private UnmanagedWriteBuffer _unmanagedWriteBuffer;        
+        private UnmanagedWriteBuffer2 _unmanagedWriteBuffer;        
         private int _currentStrStart;
         private readonly JsonOperationContext _ctx;
         private readonly JsonParserState _state;
@@ -90,7 +89,7 @@ namespace Sparrow.Json.Parsing
             _ctx = ctx;
             _state = state;
             _debugTag = debugTag;
-            _unmanagedWriteBuffer = ctx.GetStream(JsonOperationContext.InitialStreamSize);
+            _unmanagedWriteBuffer = new UnmanagedWriteBuffer2(JsonOperationContext.InitialStreamSize);
         }
 
         public void SetBuffer(JsonOperationContext.ManagedPinnedBuffer inputBuffer)
@@ -128,7 +127,7 @@ namespace Sparrow.Json.Parsing
             _maybeBeforePreamble = true;
             var previous = _unmanagedWriteBuffer.SizeInBytes;
             _unmanagedWriteBuffer.Dispose();
-            _unmanagedWriteBuffer = _ctx.GetStream(previous);
+            _unmanagedWriteBuffer = new UnmanagedWriteBuffer2(previous);
         }
 
         public (bool Done, int BytesRead) Copy(byte* output, int count)
