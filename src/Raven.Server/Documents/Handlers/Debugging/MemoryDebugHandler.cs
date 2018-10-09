@@ -179,6 +179,76 @@ namespace Raven.Server.Documents.Handlers.Debugging
         [RavenAction("/admin/debug/memory/stats", "GET", AuthorizationStatus.Operator, IsDebugInformationEndpoint = true)]
         public Task MemoryStats()
         {
+            Console.WriteLine("Starting...");
+            var filebytes = File.ReadAllBytes("/home/cesar/Sources/tmpcommand.txt");
+            Random rnd = new Random(123);
+            for (var bl = 0; bl < 1000; bl++) 
+            {
+                if (bl % 10 == 0)
+                {
+                  Console.WriteLine("\rbl =  " + bl + "  ...  ");
+                  Console.Out.Flush();
+                }
+
+                const int numOfTasks = 12;
+                var tasks = new Task[numOfTasks];
+                for (int i = 0; i < numOfTasks; i++)
+                {                    
+                    var k = i;
+
+                    tasks[i] = Task.Run(async ()=>
+                    {
+                        for (int yy=0; yy < 6; yy++)
+                        {
+                            var buffer = JsonOperationContext.ManagedPinnedBuffer.LongLivedInstance();
+                            ServerStore.ContextPool.AllocateOperationContext(out JsonOperationContext context);
+                            {
+                                MemoryStream ms = new MemoryStream(filebytes);
+
+                                using (var parser = new BatchRequestParser.ReadMany(context, ms, buffer, new System.Threading.CancellationToken()))
+                                {
+                                    await parser.Init();
+                                    for(int j=0; j<50; j++)
+                                    {
+                                        var doc = await parser.MoveNext(context);
+                                        
+                                        if (doc.Document.TryGetMember("Name", out var name) == false)
+                                        {
+                                            Console.WriteLine("Can't get Name");
+                                            Console.Out.Flush();
+                                        }
+                                        else
+                                        {
+                                            if (!name.ToString().Equals("user/"+ j))
+                                            {
+                                                Console.WriteLine("**************** name == " + name + " while expected == " + "user/"+ j);
+                                                Console.Out.Flush();
+                                            }
+
+                                        }
+                                    }
+                                }
+                            }
+                            context.Dispose();
+                        }
+                    });
+                }
+                try 
+                {
+                    Task.WaitAll(tasks);
+                }
+                catch(Exception e)
+                {
+                  var ei = e;
+                  while(ei != null){
+                      System.Console.WriteLine(ei.Message);  
+                      ei = ei.InnerException;
+                  }
+                  throw;
+                }
+            }
+
+
             using (ServerStore.ContextPool.AllocateOperationContext(out JsonOperationContext context))
             {
                 var djv = MemoryStatsInternal();

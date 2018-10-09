@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Buffers;
+using System.Collections.Generic;
 using System.Threading;
 using Sparrow.LowMemory;
 using Sparrow.Threading;
@@ -136,7 +137,10 @@ namespace Sparrow.Json
             _cts.Token.ThrowIfCancellationRequested();
             var currentThread = _contextPool.Value;
             if (TryReuseExistingContextFrom(currentThread, out context, out IDisposable returnContext))
+            {
+                context.debugCount.Add("Added 1 from " + Environment.StackTrace);
                 return returnContext;
+            }
 
             // couldn't find it on our own thread, let us try and steal from other threads
             foreach (var otherThread in _contextPool.Values)
@@ -144,11 +148,16 @@ namespace Sparrow.Json
                 if (otherThread == currentThread)
                     continue;
                 if (TryReuseExistingContextFrom(otherThread, out context, out returnContext))
+                {
+                    context.debugCount.Add("Added 2 from " + Environment.StackTrace);
                     return returnContext;
+                }
             }
 
             // no choice, got to create it
             context = CreateContext();
+            context.debugCount = new List<string>();
+            context.debugCount.Add("Created from " + Environment.StackTrace);
             return new ReturnRequestContext
             {
                 Parent = this,
@@ -163,13 +172,16 @@ namespace Sparrow.Json
                 var current = stack.Head;
                 if (current == null)
                     break;
+                   
                 if (Interlocked.CompareExchange(ref stack.Head, current.Next, current) != current)
                     continue;
+
                 context = current.Value;
                 if (context == null)
                     continue;
                 if (!context.InUse.Raise())
                     continue;
+                
                 context.Renew();
                 disposable = new ReturnRequestContext
                 {
@@ -193,12 +205,14 @@ namespace Sparrow.Json
 
             public void Dispose()
             {
+                Context.debugCount.Add("Returning" + Environment.StackTrace);
                 Context.Reset();
                 // These contexts are reused, so we don't want to use LowerOrDie here.
                 Context.InUse.Lower();
                 Context.InPoolSince = DateTime.UtcNow;
 
                 Parent.Push(Context);
+                Context.debugCount.Add("Returned " + Environment.StackTrace);
                 // Context.Dispose();
             }
 
