@@ -20,8 +20,22 @@ namespace Sparrow
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void VerifyMappedRange(void* p1, void* p2, long size)
+        {
+            //
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void VerifyMappedRange(void* p1, long size)
+        {
+            //
+        }
+        
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int CompareInline(void* p1, void* p2, int size)
         {
+            VerifyMappedRange(p1, p2, size);
             // If we use an unmanaged bulk version with an inline compare the caller site does not get optimized properly.
             // If you know you will be comparing big memory chunks do not use the inline version. 
             if (size > CompareInlineVsCallThreshold)
@@ -113,6 +127,8 @@ UnmanagedCompare:
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int CompareInline(void* p1, void* p2, int size, out int position)
         {
+            VerifyMappedRange(p1, p2, size);
+            
             byte* bpx = (byte*)p1;
             byte* bpy = (byte*)p2;
 
@@ -175,12 +191,15 @@ UnmanagedCompare:
         
         private static void BulkCopy(void* dest, void* src, long n)
         {
+            VerifyMappedRange(dest, src, n);
+            
             UnmanagedMemory.Copy((byte*)dest, (byte*)src, n);            
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Copy(void* dest, void* src, uint n)
         {
+            VerifyMappedRange(dest, src, n);
             Unsafe.CopyBlock(dest, src, n);
         }
 
@@ -188,6 +207,7 @@ UnmanagedCompare:
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Copy(void* dest, void* src, int n)
         {
+            VerifyMappedRange(dest, src, (uint)n);
             Unsafe.CopyBlock(dest, src, (uint)n);
         }
 
@@ -196,22 +216,26 @@ UnmanagedCompare:
         {
             if (n < uint.MaxValue)
             {
+                VerifyMappedRange(dest, src, (uint)n);
                 Unsafe.CopyBlock(dest, src, (uint)n); // Common code-path
                 return;
             }
 
+            VerifyMappedRange(dest, src, n);
             BulkCopy(dest, src, n);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Set(byte* dest, byte value, uint n)
         {
+            VerifyMappedRange(dest, n);
             Unsafe.InitBlock(dest, value, n);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Set(byte* dest, byte value, int n)
         {
+            VerifyMappedRange(dest, n);
             Unsafe.InitBlock(dest, value, (uint)n);
         }
 
@@ -232,10 +256,12 @@ UnmanagedCompare:
 
             if (n < int.MaxValue)
             {
+                VerifyMappedRange(dest, (uint)n);
                 Unsafe.InitBlock(dest, value, (uint)n);
             }
             else
             {
+                VerifyMappedRange(dest, n);
                 UnmanagedMemory.Set(dest, value, n);
             }
 
