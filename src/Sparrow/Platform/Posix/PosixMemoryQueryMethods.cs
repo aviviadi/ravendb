@@ -16,37 +16,49 @@ namespace Sparrow.Platform.Posix
 
             var vecSize = (int)((length + Syscall.PageSize - 1) / Syscall.PageSize);
 
-            var p = stackalloc IntPtr[2];
-            IntPtr vec = IntPtr.Zero;
-            char* pVec;
-            if (vecSize > 4)
-            {
-                vec = Marshal.AllocHGlobal(vecSize);
-                pVec = (char *)vec.ToPointer();
-            }
-            else
-            {
-                pVec = (char*)p;
-            }
-
+            IntPtr pPtr = IntPtr.Zero;
             try
             {
-                if (Syscall.mincore(address, new IntPtr(length), pVec) != 0)
-                    throw new MemoryInfoException($"Failed to mincore address: {new IntPtr(address).ToInt64()}, with length: {length}. Last Error = {Marshal.GetLastWin32Error()}");
-
-                for (var i = 0; i < vecSize; i++)
+                var p = stackalloc IntPtr[2];
+                pPtr = new IntPtr(p);
+                Memory.RegisterVerification(pPtr, new UIntPtr((ulong)sizeof(IntPtr)*2), "hglobal");
+                IntPtr vec = IntPtr.Zero;
+                char* pVec;
+                if (vecSize > 4)
                 {
-                    if ((*((byte*)pVec + i) & 1) == 0)
-                        continue;
-
-                    return true;
+                    vec = Marshal.AllocHGlobal(vecSize);
+                    pVec = (char*)vec.ToPointer();
                 }
-                return false;
+                else
+                {
+                    pVec = (char*)p;
+                }
+
+                try
+                {
+                    if (Syscall.mincore(address, new IntPtr(length), pVec) != 0)
+                        throw new MemoryInfoException(
+                            $"Failed to mincore address: {new IntPtr(address).ToInt64()}, with length: {length}. Last Error = {Marshal.GetLastWin32Error()}");
+
+                    for (var i = 0; i < vecSize; i++)
+                    {
+                        if ((*((byte*)pVec + i) & 1) == 0)
+                            continue;
+
+                        return true;
+                    }
+
+                    return false;
+                }
+                finally
+                {
+                    if (vec != IntPtr.Zero)
+                        Marshal.FreeHGlobal(vec);
+                }
             }
             finally
             {
-                if (vec != IntPtr.Zero)
-                    Marshal.FreeHGlobal(vec);
+                Memory.UnregisterVerification(pPtr, new UIntPtr((ulong)sizeof(IntPtr)*2), "hglobal");
             }
         }
     }

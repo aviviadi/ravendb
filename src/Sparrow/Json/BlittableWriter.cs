@@ -48,13 +48,15 @@ namespace Sparrow.Json
         {
             _context = context;
             _unmanagedWriteBuffer = writer;
-            _innerBuffer = _context.GetMemory(32);
+            _innerBuffer = _context.GetMemory(2);
+//            _innerBuffer = _context.GetMemory(32);
         }
 
         public BlittableWriter(JsonOperationContext context)
         {
             _context = context;
-            _innerBuffer = _context.GetMemory(32);
+//            _innerBuffer = _context.GetMemory(32);
+            _innerBuffer = _context.GetMemory(2);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -159,7 +161,8 @@ namespace Sparrow.Json
             _unmanagedWriteBuffer = (TWriter)(object)_context.GetStream(_lastSize);
             _position = 0;
             if(_innerBuffer == null)
-                _innerBuffer = _context.GetMemory(32);
+                _innerBuffer = _context.GetMemory(2);
+//                _innerBuffer = _context.GetMemory(32);
         }
 
         public WriteToken WriteObjectMetadata(FastList<PropertyTag> properties, long firstWrite, int maxPropId)

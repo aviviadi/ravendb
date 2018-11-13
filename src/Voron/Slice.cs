@@ -92,7 +92,7 @@ namespace Voron
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static ByteStringContext.InternalScope From(ByteStringContext context, string value, ByteStringType type, out Slice str)
-        {
+        {            
             var scope = context.From(value, type, out ByteString s);
             str = new Slice(s);
             return scope;

@@ -114,7 +114,7 @@ namespace Sparrow.Platform
             // {
             //     throw new InvalidOperationException("Failed to free call msync " + (IntPtr)address + ". Err=" + Marshal.GetLastWin32Error());
             // }
-            Syscall.munmap((IntPtr)address, (UIntPtr)(uint)dwSize);
+            Syscall.munmap_withVerification((IntPtr)address, (UIntPtr)(uint)dwSize);
 
               Interlocked.Add(ref usage, -dwSize);
         }

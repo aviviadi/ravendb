@@ -273,71 +273,81 @@ namespace Voron
 
         private unsafe void LoadExistingDatabase()
         {
-            var header = stackalloc TransactionHeader[1];
-            bool hadIntegrityIssues;
-
-            Options.AddToInitLog?.Invoke("Starting Recovery");
-            hadIntegrityIssues = _journal.RecoverDatabase(header, Options.AddToInitLog);
-            var successString = hadIntegrityIssues ? "(successfully)" : "(with integrity issues)";
-            Options.AddToInitLog?.Invoke($"Recovery Ended {successString}");
-
-            if (hadIntegrityIssues)
+            IntPtr headerPtr = IntPtr.Zero;
+            try 
             {
-                var message = _journal.Files.Count == 0 ? "Unrecoverable database" : "Database recovered partially. Some data was lost.";
+                var header = stackalloc TransactionHeader[1];
+                headerPtr = new IntPtr(header);
+                Memory.RegisterVerification(headerPtr, new UIntPtr((ulong)sizeof(TransactionHeader)), "stackalloc");
+                bool hadIntegrityIssues;
 
-                _options.InvokeRecoveryError(this, message, null);
-            }
+                Options.AddToInitLog?.Invoke("Starting Recovery");
+                hadIntegrityIssues = _journal.RecoverDatabase(header, Options.AddToInitLog);
+                var successString = hadIntegrityIssues ? "(successfully)" : "(with integrity issues)";
+                Options.AddToInitLog?.Invoke($"Recovery Ended {successString}");
 
-            var entry = _headerAccessor.CopyHeader();
-            var nextPageNumber = (header->TransactionId == 0 ? entry.LastPageNumber : header->LastPageNumber) + 1;
-            State = new StorageEnvironmentState(null, nextPageNumber)
-            {
-                NextPageNumber = nextPageNumber,
-                Options = Options
-            };
-
-            Interlocked.Exchange(ref _transactionsCounter, header->TransactionId == 0 ? entry.TransactionId : header->TransactionId);
-            var transactionPersistentContext = new TransactionPersistentContext(true);
-            using (var tx = NewLowLevelTransaction(transactionPersistentContext, TransactionFlags.ReadWrite))
-            using (var root = Tree.Open(tx, null, Constants.RootTreeNameSlice, header->TransactionId == 0 ? &entry.Root : &header->Root))
-            using (var writeTx = new Transaction(tx))
-            {
-                tx.UpdateRootsIfNeeded(root);
-
-                var metadataTree = writeTx.ReadTree(Constants.MetadataTreeNameSlice);
-                if (metadataTree == null)
-                    VoronUnrecoverableErrorException.Raise(this,
-                        "Could not find metadata tree in database, possible mismatch / corruption?");
-
-                Debug.Assert(metadataTree != null);
-                // ReSharper disable once PossibleNullReferenceException
-                var dbId = metadataTree.Read("db-id");
-                if (dbId == null)
-                    VoronUnrecoverableErrorException.Raise(this,
-                        "Could not find db id in metadata tree, possible mismatch / corruption?");
-
-                var buffer = new byte[16];
-                Debug.Assert(dbId != null);
-                // ReSharper disable once PossibleNullReferenceException
-                var dbIdBytes = dbId.Reader.Read(buffer, 0, 16);
-                if (dbIdBytes != 16)
-                    VoronUnrecoverableErrorException.Raise(this,
-                        "The db id value in metadata tree wasn't 16 bytes in size, possible mismatch / corruption?");
-
-                var databaseGuidId = _options.GenerateNewDatabaseId == false ? new Guid(buffer) : Guid.NewGuid();
-
-                FillBase64Id(databaseGuidId);
-
-                if (_options.GenerateNewDatabaseId)
+                if (hadIntegrityIssues)
                 {
-                    // save the new database id
-                    metadataTree?.Add("db-id", DbId.ToByteArray());
+                    var message = _journal.Files.Count == 0 ? "Unrecoverable database" : "Database recovered partially. Some data was lost.";
+
+                    _options.InvokeRecoveryError(this, message, null);
                 }
 
-                tx.Commit();
-            }
+                var entry = _headerAccessor.CopyHeader();
+                var nextPageNumber = (header->TransactionId == 0 ? entry.LastPageNumber : header->LastPageNumber) + 1;
+                State = new StorageEnvironmentState(null, nextPageNumber)
+                {
+                    NextPageNumber = nextPageNumber,
+                    Options = Options
+                };
 
-            UpgradeSchemaIfRequired();
+                Interlocked.Exchange(ref _transactionsCounter, header->TransactionId == 0 ? entry.TransactionId : header->TransactionId);
+                var transactionPersistentContext = new TransactionPersistentContext(true);
+                using (var tx = NewLowLevelTransaction(transactionPersistentContext, TransactionFlags.ReadWrite))
+                using (var root = Tree.Open(tx, null, Constants.RootTreeNameSlice, header->TransactionId == 0 ? &entry.Root : &header->Root))
+                using (var writeTx = new Transaction(tx))
+                {
+                    tx.UpdateRootsIfNeeded(root);
+
+                    var metadataTree = writeTx.ReadTree(Constants.MetadataTreeNameSlice);
+                    if (metadataTree == null)
+                        VoronUnrecoverableErrorException.Raise(this,
+                            "Could not find metadata tree in database, possible mismatch / corruption?");
+
+                    Debug.Assert(metadataTree != null);
+                    // ReSharper disable once PossibleNullReferenceException
+                    var dbId = metadataTree.Read("db-id");
+                    if (dbId == null)
+                        VoronUnrecoverableErrorException.Raise(this,
+                            "Could not find db id in metadata tree, possible mismatch / corruption?");
+
+                    var buffer = new byte[16];
+                    Debug.Assert(dbId != null);
+                    // ReSharper disable once PossibleNullReferenceException
+                    var dbIdBytes = dbId.Reader.Read(buffer, 0, 16);
+                    if (dbIdBytes != 16)
+                        VoronUnrecoverableErrorException.Raise(this,
+                            "The db id value in metadata tree wasn't 16 bytes in size, possible mismatch / corruption?");
+
+                    var databaseGuidId = _options.GenerateNewDatabaseId == false ? new Guid(buffer) : Guid.NewGuid();
+
+                    FillBase64Id(databaseGuidId);
+
+                    if (_options.GenerateNewDatabaseId)
+                    {
+                        // save the new database id
+                        metadataTree?.Add("db-id", DbId.ToByteArray());
+                    }
+
+                    tx.Commit();
+                }
+
+                UpgradeSchemaIfRequired();
+            }
+            finally
+            {
+                Memory.UnregisterVerification(headerPtr, new UIntPtr((ulong)sizeof(TransactionHeader)), "stackalloc");
+            }
         }
 
         private void UpgradeSchemaIfRequired()

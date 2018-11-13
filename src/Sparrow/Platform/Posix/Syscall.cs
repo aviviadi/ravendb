@@ -104,11 +104,19 @@ namespace Sparrow.Platform.Posix
         {
             if (PlatformDetails.RunningOnMacOsx)
                 return mmap64_mac(start, length, prot, flags, fd, offset);
-            return mmap64_posix(start, length, prot, flags, fd, offset);
+            var rc = mmap64_posix(start, length, prot, flags, fd, offset);
+            Memory.RegisterVerification(rc, length, "mmap64_posix");
+            return rc;
         }
 
         [DllImport(LIBC_6, SetLastError = true)]
         public static extern int munmap(IntPtr start, UIntPtr length);
+
+        public static int munmap_withVerification(IntPtr start, UIntPtr length)
+        {
+            Memory.UnregisterVerification(start, length, "munmap");
+            return munmap(start, length);
+        }
 
         // posix_memalign(3)
         //     int posix_memalign(void** memptr, size_t alignment, size_t size);

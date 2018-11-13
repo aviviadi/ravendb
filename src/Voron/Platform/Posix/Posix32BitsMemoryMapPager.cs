@@ -155,7 +155,7 @@ namespace Voron.Platform.Posix
 
                 if (numberOfPages + distanceFromStart > NumberOfPagesInAllocationGranularity)
                 {
-                    Syscall.munmap(result, (UIntPtr)sizeToMap);
+                    Syscall.munmap_withVerification(result, (UIntPtr)sizeToMap);
                     result = new IntPtr(-1);
                     sizeToMap = NearestSizeToAllocationGranularity((numberOfPages + distanceFromStart) *
                                                            Constants.Storage.PageSize);
@@ -181,7 +181,7 @@ namespace Voron.Platform.Posix
             finally
             {
                 if (result.ToInt64() != -1)
-                    Syscall.munmap(result, (UIntPtr)sizeToMap);
+                    Syscall.munmap_withVerification(result, (UIntPtr)sizeToMap);
 
             }
         }
@@ -359,7 +359,7 @@ namespace Voron.Platform.Posix
                         continue;
 
                     Interlocked.Add(ref _totalMapped, -addr.Size);
-                    Syscall.munmap(addr.Address, (UIntPtr)addr.Size);
+                    Syscall.munmap_withVerification(addr.Address, (UIntPtr)addr.Size);
                     NativeMemory.UnregisterFileMapping(addr.File, addr.Address, addr.Size);
 
                     if (set.Count == 0)

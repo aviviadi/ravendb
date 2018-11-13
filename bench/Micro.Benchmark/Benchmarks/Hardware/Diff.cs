@@ -1560,7 +1560,7 @@ namespace Micro.Benchmark.Benchmarks.Hardware
                 outputPtr[1] = count;
                 outputSize += sizeof(long) * 2;
 
-                Unsafe.CopyBlockUnaligned(Output + outputSize, modified + start, (uint)count);
+                Memory.Copy/*ADIADI::Mem*/Unaligned(Output + outputSize, modified + start, (uint)count);
                 OutputSize = outputSize + count;
             }
 
@@ -1812,7 +1812,7 @@ namespace Micro.Benchmark.Benchmarks.Hardware
                 outputPtr[1] = runLengthInBytes;
                 outputSize += sizeof(long) * 2;
 
-                Unsafe.CopyBlock(Output + outputSize, (srcPtr + destOffset) + startIdx, (uint)runLengthInBytes);
+                Memory.Copy/*ADIADI::Mem*/(Output + outputSize, (srcPtr + destOffset) + startIdx, (uint)runLengthInBytes);
 
                 OutputSize = outputSize + runLengthInBytes;
             }
@@ -1953,7 +1953,7 @@ namespace Micro.Benchmark.Benchmarks.Hardware
                 outputPtr[1] = runLengthInBytes;
                 outputSize += sizeof(long) * 2;
 
-                Unsafe.CopyBlock(Output + outputSize, (srcPtr + destOffset) + startIdx, (uint)runLengthInBytes);
+                Memory.Copy/*ADIADI::Mem*/(Output + outputSize, (srcPtr + destOffset) + startIdx, (uint)runLengthInBytes);
 
                 OutputSize = outputSize + runLengthInBytes;
             }
@@ -2212,7 +2212,7 @@ namespace Micro.Benchmark.Benchmarks.Hardware
                 *(long*)(outputPtr + 0) = startIdx;
                 *(long*)(outputPtr + 8) = runLengthInBytes;
 
-                Unsafe.CopyBlock(outputPtr + 16, srcPtr + (destOffset + startIdx), (uint)runLengthInBytes);
+                Memory.Copy/*ADIADI::Mem*/(outputPtr + 16, srcPtr + (destOffset + startIdx), (uint)runLengthInBytes);
 
                 OutputSize += runLengthInBytes + 16;
             }
@@ -2740,7 +2740,7 @@ namespace Micro.Benchmark.Benchmarks.Hardware
                 for (Range* end = (Range*)(Output + size); rangePtr < end; rangePtr++)
                 {
                     *((Range*)writePtr) = *rangePtr;
-                    Unsafe.CopyBlock(writePtr + 16, (byte*)modifiedBuffer + rangePtr->Start, (uint)rangePtr->Count);
+                    Memory.Copy/*ADIADI::Mem*/(writePtr + 16, (byte*)modifiedBuffer + rangePtr->Start, (uint)rangePtr->Count);
 
                     writePtr += rangePtr->Count + 16;
                 }
@@ -2817,7 +2817,7 @@ namespace Micro.Benchmark.Benchmarks.Hardware
                 for (Range* end = (Range*)(Output + size); rangePtr < end; rangePtr++)
                 {
                     *((Range*)writePtr) = *rangePtr;
-                    Unsafe.CopyBlock(writePtr + 16, (byte*)modifiedBuffer + rangePtr->Start, (uint)rangePtr->Count);
+                    Memory.Copy/*ADIADI::Mem*/(writePtr + 16, (byte*)modifiedBuffer + rangePtr->Start, (uint)rangePtr->Count);
 
                     writePtr += rangePtr->Count + 16;
                 }
@@ -2900,7 +2900,7 @@ namespace Micro.Benchmark.Benchmarks.Hardware
                 for (Range* end = (Range*)(Output + size); rangePtr < end; rangePtr++)
                 {
                     *((Range*)writePtr) = *rangePtr;
-                    Unsafe.CopyBlock(writePtr + 16, (byte*)modifiedBuffer + rangePtr->Start, (uint)rangePtr->Count);
+                    Memory.Copy/*ADIADI::Mem*/(writePtr + 16, (byte*)modifiedBuffer + rangePtr->Start, (uint)rangePtr->Count);
 
                     writePtr += rangePtr->Count + 16;
                 }
@@ -2982,7 +2982,7 @@ namespace Micro.Benchmark.Benchmarks.Hardware
                 for (Range* end = (Range*)(Output + size); rangePtr < end; rangePtr++)
                 {
                     *((Range*)writePtr) = *rangePtr;
-                    Unsafe.CopyBlock(writePtr + 16, (byte*)modifiedBuffer + rangePtr->Start, (uint)rangePtr->Count);
+                    Memory.Copy/*ADIADI::Mem*/(writePtr + 16, (byte*)modifiedBuffer + rangePtr->Start, (uint)rangePtr->Count);
 
                     writePtr += rangePtr->Count + 16;
                 }
@@ -3064,7 +3064,7 @@ namespace Micro.Benchmark.Benchmarks.Hardware
                 for (Range* end = (Range*)(Output + size); rangePtr < end; rangePtr++)
                 {
                     *((Range*)writePtr) = *rangePtr;
-                    Unsafe.CopyBlock(writePtr + 16, (byte*)modifiedBuffer + rangePtr->Start, (uint)rangePtr->Count);
+                    Memory.Copy/*ADIADI::Mem*/(writePtr + 16, (byte*)modifiedBuffer + rangePtr->Start, (uint)rangePtr->Count);
 
                     writePtr += rangePtr->Count + 16;
                 }
@@ -3136,7 +3136,7 @@ namespace Micro.Benchmark.Benchmarks.Hardware
                 for (Range* end = (Range*)(Output + size); rangePtr < end; rangePtr++)
                 {
                     *((Range*)writePtr) = *rangePtr;
-                    Unsafe.CopyBlock(writePtr + 16, (byte*)modifiedBuffer + rangePtr->Start, (uint)rangePtr->Count);
+                    Memory.Copy/*ADIADI::Mem*/(writePtr + 16, (byte*)modifiedBuffer + rangePtr->Start, (uint)rangePtr->Count);
 
                     writePtr += rangePtr->Count + 16;
                 }
@@ -3211,7 +3211,7 @@ namespace Micro.Benchmark.Benchmarks.Hardware
                 for (Range* end = (Range*)(Output + size); rangePtr < end; rangePtr++)
                 {
                     *((Range*)writePtr) = *rangePtr;
-                    Unsafe.CopyBlock(writePtr + 16, (byte*)modifiedBuffer + rangePtr->Start, (uint)rangePtr->Count);
+                    Memory.Copy/*ADIADI::Mem*/(writePtr + 16, (byte*)modifiedBuffer + rangePtr->Start, (uint)rangePtr->Count);
 
                     writePtr += rangePtr->Count + 16;
                 }
@@ -3281,7 +3281,7 @@ namespace Micro.Benchmark.Benchmarks.Hardware
                 for (Range* end = (Range*)(Output + size); rangePtr < end; rangePtr++)
                 {
                     *((Range*)writePtr) = *rangePtr;
-                    Unsafe.CopyBlock(writePtr + 16, (byte*)modifiedBuffer + rangePtr->Start, (uint)rangePtr->Count);
+                    Memory.Copy/*ADIADI::Mem*/(writePtr + 16, (byte*)modifiedBuffer + rangePtr->Start, (uint)rangePtr->Count);
 
                     writePtr += rangePtr->Count + 16;
                 }
@@ -3354,7 +3354,7 @@ namespace Micro.Benchmark.Benchmarks.Hardware
                 for (Range* end = (Range*)(Output + size); rangePtr < end; rangePtr++)
                 {
                     *((Range*)writePtr) = *rangePtr;
-                    Unsafe.CopyBlock(writePtr + 16, (byte*)modifiedBuffer + rangePtr->Start, (uint)rangePtr->Count);
+                    Memory.Copy/*ADIADI::Mem*/(writePtr + 16, (byte*)modifiedBuffer + rangePtr->Start, (uint)rangePtr->Count);
 
                     writePtr += rangePtr->Count + 16;
                 }
@@ -3431,7 +3431,7 @@ namespace Micro.Benchmark.Benchmarks.Hardware
                 for (Range* end = (Range*)(Output + size); rangePtr < end; rangePtr++)
                 {
                     *((Range*)writePtr) = *rangePtr;
-                    Unsafe.CopyBlock(writePtr + 16, (byte*)modifiedBuffer + rangePtr->Start, (uint)rangePtr->Count);
+                    Memory.Copy/*ADIADI::Mem*/(writePtr + 16, (byte*)modifiedBuffer + rangePtr->Start, (uint)rangePtr->Count);
 
                     writePtr += rangePtr->Count + 16;
                 }
@@ -3499,7 +3499,7 @@ namespace Micro.Benchmark.Benchmarks.Hardware
                 for (Range* end = (Range*)(Output + size); rangePtr < end; rangePtr++)
                 {
                     *((Range*)writePtr) = *rangePtr;
-                    Unsafe.CopyBlock(writePtr + 16, (byte*)modifiedBuffer + rangePtr->Start, (uint)rangePtr->Count);
+                    Memory.Copy/*ADIADI::Mem*/(writePtr + 16, (byte*)modifiedBuffer + rangePtr->Start, (uint)rangePtr->Count);
 
                     writePtr += rangePtr->Count + 16;
                 }

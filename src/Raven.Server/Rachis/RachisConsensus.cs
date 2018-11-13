@@ -287,15 +287,24 @@ namespace Raven.Server.Rachis
         {
             using (StorageEnvironment.GetStaticContext(out var ctx))
             {
-                Slice.From(ctx, "GlobalState", out GlobalStateSlice);
-                Slice.From(ctx, "Tag", out TagSlice);
-                Slice.From(ctx, "CurrentTerm", out CurrentTermSlice);
-                Slice.From(ctx, "VotedFor", out VotedForSlice);
-                Slice.From(ctx, "LastCommit", out LastCommitSlice);
-                Slice.From(ctx, "Topology", out TopologySlice);
-                Slice.From(ctx, "LastTruncated", out LastTruncatedSlice);
-                Slice.From(ctx, "Entries", out EntriesSlice);
+                var s1 = "GlobalState";      
+                Slice.From(ctx, TableSchema.AddRegString(ref s1), out GlobalStateSlice);
+                var s2 = "Tag";
+                Slice.From(ctx, TableSchema.AddRegString(ref s2), out TagSlice);
+                var s3 = "CurrentTerm";
+                Slice.From(ctx, TableSchema.AddRegString(ref s3), out CurrentTermSlice);
+                var s4 = "VotedFor";
+                Slice.From(ctx, TableSchema.AddRegString(ref s4), out VotedForSlice);
+                var s5 = "LastCommit";
+                Slice.From(ctx, TableSchema.AddRegString(ref s5), out LastCommitSlice);
+                var s6 = "Topology";
+                Slice.From(ctx, TableSchema.AddRegString(ref s6), out TopologySlice);
+                var s7 = "LastTruncated";
+                Slice.From(ctx, TableSchema.AddRegString(ref s7), out LastTruncatedSlice);
+                var s8 = "Entries";
+                Slice.From(ctx, TableSchema.AddRegString(ref s8), out EntriesSlice);
             }
+            
             /*
              
             index - int64 big endian
@@ -1315,17 +1324,26 @@ namespace Raven.Server.Rachis
         {
             var table = context.Transaction.InnerTransaction.OpenTable(LogsTable, EntriesSlice);
             var reversedIndex = Bits.SwapBytes(index);
-            using (Slice.External(context.Allocator, (byte*)&reversedIndex, sizeof(long), out Slice key))
+            Memory.RegisterVerification(new IntPtr((byte*)&reversedIndex), new UIntPtr(8UL), "fixed");
+            try
             {
-                if (table.ReadByKey(key, out TableValueReader reader) == false)
+                using (Slice.External(context.Allocator, (byte*)&reversedIndex, sizeof(long), out Slice key))
                 {
-                    flags = RachisEntryFlags.Invalid;
-                    return null;
+                    if (table.ReadByKey(key, out TableValueReader reader) == false)
+                    {
+                        flags = RachisEntryFlags.Invalid;
+                        return null;
+                    }
+
+                    flags = *(RachisEntryFlags*)reader.Read(3, out int size);
+                    Debug.Assert(size == sizeof(RachisEntryFlags));
+                    var ptr = reader.Read(2, out size);
+                    return new BlittableJsonReaderObject(ptr, size, context);
                 }
-                flags = *(RachisEntryFlags*)reader.Read(3, out int size);
-                Debug.Assert(size == sizeof(RachisEntryFlags));
-                var ptr = reader.Read(2, out size);
-                return new BlittableJsonReaderObject(ptr, size, context);
+            }
+            finally
+            {
+                Memory.UnregisterVerification(new IntPtr((byte*)&reversedIndex), new UIntPtr(8UL), "fixed");
             }
         }
 
@@ -1486,24 +1504,33 @@ namespace Raven.Server.Rachis
             Debug.Assert(context.Transaction != null);
             var table = context.Transaction.InnerTransaction.OpenTable(LogsTable, EntriesSlice);
             var reversedIndex = Bits.SwapBytes(index);
-            using (
-    Slice.External(context.Transaction.InnerTransaction.Allocator, (byte*)&reversedIndex, sizeof(long),
-        out Slice key))
+            Memory.RegisterVerification(new IntPtr((byte*)&reversedIndex), new UIntPtr(8UL), "fixed");
+            try
             {
-                if (table.ReadByKey(key, out TableValueReader reader) == false)
+                using (
+                    Slice.External(context.Transaction.InnerTransaction.Allocator, (byte*)&reversedIndex, sizeof(long),
+                        out Slice key))
                 {
-                    GetLastCommitIndex(context, out long lastIndex, out long lastTerm);
-                    if (lastIndex == index)
-                        return lastTerm;
-                    GetLastTruncated(context, out lastIndex, out lastTerm);
-                    if (lastIndex == index)
-                        return lastTerm;
-                    return null;
+                    if (table.ReadByKey(key, out TableValueReader reader) == false)
+                    {
+                        GetLastCommitIndex(context, out long lastIndex, out long lastTerm);
+                        if (lastIndex == index)
+                            return lastTerm;
+                        GetLastTruncated(context, out lastIndex, out lastTerm);
+                        if (lastIndex == index)
+                            return lastTerm;
+                        return null;
+                    }
+
+                    var term = *(long*)reader.Read(1, out int size);
+                    Debug.Assert(size == sizeof(long));
+                    Debug.Assert(term != 0);
+                    return term;
                 }
-                var term = *(long*)reader.Read(1, out int size);
-                Debug.Assert(size == sizeof(long));
-                Debug.Assert(term != 0);
-                return term;
+            }
+            finally
+            {
+                Memory.UnregisterVerification(new IntPtr((byte*)&reversedIndex), new UIntPtr(8UL), "fixed");
             }
         }
 

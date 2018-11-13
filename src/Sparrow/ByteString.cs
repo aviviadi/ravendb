@@ -629,7 +629,8 @@ namespace Sparrow
 
     public sealed class ByteStringContext : ByteStringContext<ByteStringMemoryCache>
     {
-        public const int MinBlockSizeInBytes = 4 * 1024; // If this is changed, we need to change also LogMinBlockSize.
+        public const int MinBlockSizeInBytes = 128; // If this is changed, we need to change also LogMinBlockSize.
+//        public const int MinBlockSizeInBytes = 4 * 1024; // If this is changed, we need to change also LogMinBlockSize.
         public const int MaxAllocationBlockSizeInBytes = 256 * MinBlockSizeInBytes;
         public const int DefaultAllocationBlockSizeInBytes = 1 * MinBlockSizeInBytes;
         public const int MinReusableBlockSizeInBytes = 8;
@@ -821,9 +822,11 @@ namespace Sparrow
             }
             else
             {
+                var tmp2 = -1;
                 if (_externalCurrentLeft == 0)
                 {
                     var tmp = Math.Min(2 * Constants.Size.Megabyte, _allocationBlockSize * 2);
+                    tmp2 = tmp;
                     AllocateExternalSegment(tmp);
                     _allocationBlockSize = tmp;
                 }

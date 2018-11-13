@@ -896,30 +896,55 @@ ReturnFalse:
 
         private void WriteUnicodeCharacterToStringBuffer(int val)
         {
-            var smallBuffer = stackalloc byte[8];
-            var chars = stackalloc char[1];
+            //_unmanagedWriteBuffer.Sb = "[WUCTSB:Entry]";
+            IntPtr smallBufferPtr = IntPtr.Zero;
+            IntPtr charsPtr = IntPtr.Zero;
             try
             {
-                chars[0] = Convert.ToChar(val);
+                var smallBuffer = stackalloc byte[8];
+                var chars = stackalloc char[1];
+                smallBufferPtr = new IntPtr(smallBuffer);
+                //_unmanagedWriteBuffer.Sb+=($"[sB={smallBufferPtr.ToInt64()}]");
+                charsPtr = new IntPtr(chars);
+                //_unmanagedWriteBuffer.Sb+=($"[cP={charsPtr.ToInt64()}]");
+                Memory.RegisterVerification(smallBufferPtr, new UIntPtr(8UL), "stackalloc");
+                Memory.RegisterVerification(charsPtr, new UIntPtr((ulong)sizeof(char)), "stackalloc");
+                try
+                {                    
+                    chars[0] = Convert.ToChar(val);
+                    //_unmanagedWriteBuffer.Sb+=($"[vl={val}][ch={(int)chars[0]}]");
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("No WAY!!" + e);
+                    throw new FormatException("Could not convert value " + val + " to char", e);
+                }
+
+                var byteCount = Encodings.Utf8.GetBytes(chars, 1, smallBuffer, 8);
+                //_unmanagedWriteBuffer.Sb+=($"[bC={byteCount}]");
+                _unmanagedWriteBuffer.Write(smallBuffer, byteCount);
             }
-            catch (Exception e)
+            finally
             {
-                throw new FormatException("Could not convert value " + val + " to char", e);
+                Memory.UnregisterVerification(smallBufferPtr, new UIntPtr(8UL), "stackalloc");
+                Memory.UnregisterVerification(charsPtr, new UIntPtr((ulong)sizeof(char)), "stackalloc");
             }
-            var byteCount = Encodings.Utf8.GetBytes(chars, 1, smallBuffer, 8);
-            _unmanagedWriteBuffer.Write(smallBuffer, byteCount);
         }
 
 
         public void ValidateFloat()
         {
+            IntPtr tmpBuffPtr = IntPtr.Zero;
+            var numLength = -1;
             try
             {
-                int numLength = _unmanagedWriteBuffer.SizeInBytes;
+                numLength = _unmanagedWriteBuffer.SizeInBytes;
 
                 if (numLength <= 100)
                 {
                     byte* tmpBuff = stackalloc byte[numLength];
+                    tmpBuffPtr = new IntPtr(tmpBuff);
+                    Memory.RegisterVerification(tmpBuffPtr, new UIntPtr((ulong)numLength), "stackalloc");
                     _unmanagedWriteBuffer.CopyTo(tmpBuff);
                     _ctx.ParseDouble(tmpBuff, numLength);
                 }
@@ -929,7 +954,7 @@ ReturnFalse:
 
                     try
                     {
-                        _unmanagedWriteBuffer.CopyTo(memoryForNumber.Address);                        
+                        _unmanagedWriteBuffer.CopyTo(memoryForNumber.Address);
                         _ctx.ParseDouble(memoryForNumber.Address, numLength);
                     }
                     finally
@@ -938,14 +963,18 @@ ReturnFalse:
                     }
 
                 }
-                
+
             }
 #pragma warning disable RDB0004 // Exception handler is empty or just logging
             catch (Exception e)
             {
-                ThrowException("Could not parse double", e);                
+                ThrowException("Could not parse double", e);
             }
 #pragma warning restore RDB0004 // Exception handler is empty or just logging
+            finally
+            {
+                Memory.RegisterVerification(tmpBuffPtr, new UIntPtr((ulong)numLength), "stackalloc");
+            }
         }
 
 

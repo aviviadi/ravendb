@@ -72,7 +72,7 @@ namespace Voron.Platform.Posix
                 }
             }
 
-            var result = Syscall.munmap(ptr, (UIntPtr)size);
+            var result = Syscall.munmap_withVerification(ptr, (UIntPtr)size);
             if (result == -1)
             {
                 var err = Marshal.GetLastWin32Error();

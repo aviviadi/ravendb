@@ -242,10 +242,12 @@ namespace Voron.Data.BTrees
             Debug.Assert(value != null);
 
             using (DirectAdd(key, value.Length, out byte* ptr))
-            {
+            {                
                 fixed (byte* src = value)
                 {
+                    Memory.RegisterVerification(new IntPtr((byte*)src), new UIntPtr((ulong)value.Length), "fixed");
                     Memory.Copy(ptr, src, value.Length);
+                    Memory.UnregisterVerification(new IntPtr((byte*)src), new UIntPtr((ulong)value.Length), "fixed");
                 }
             }
         }
@@ -256,7 +258,11 @@ namespace Voron.Data.BTrees
                 ThrowNullReferenceException();
 
             using (DirectAdd(key, value.Size, out byte* ptr))
+            {
+                // Memory.RegisterVerification(new IntPtr((byte*)ptr), new UIntPtr((ulong)value.Size), "assumeWorks");
                 value.CopyTo(ptr);
+                // Memory.UnregisterVerification(new IntPtr((byte*)ptr), new UIntPtr((ulong)value.Size), "assumeWorks");
+            }
         }
 
         private static void CopyStreamToPointer(LowLevelTransaction tx, Stream value, byte* pos)

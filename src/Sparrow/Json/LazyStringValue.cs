@@ -4,6 +4,8 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
+using System.Text;
 using Sparrow.Binary;
 using Sparrow.Utils;
 
@@ -142,7 +144,12 @@ namespace Sparrow.Json
                 if (Size != tmpSize)
                     return false;
 
-                return Memory.CompareInline(Buffer, pBuffer, tmpSize) == 0;
+                Memory.RegisterVerification(new IntPtr(pOther), new UIntPtr((ulong)Encoding.Unicode.GetByteCount(other)), "fixed");
+                Memory.RegisterVerification(new IntPtr(pBuffer), new UIntPtr((ulong)_lazyStringTempComparisonBuffer.Length), "fixed");
+                var rc = Memory.CompareInline(Buffer, pBuffer, tmpSize) == 0;
+                Memory.UnregisterVerification(new IntPtr(pOther), new UIntPtr((ulong)Encoding.Unicode.GetByteCount(other)), "fixed");
+                Memory.UnregisterVerification(new IntPtr(pBuffer), new UIntPtr((ulong)_lazyStringTempComparisonBuffer.Length), "fixed");
+                return rc;
             }
         }
 

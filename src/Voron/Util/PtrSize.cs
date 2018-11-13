@@ -61,8 +61,8 @@ namespace Voron.Util
         /// <param name="value">Value to insert</param>
         /// <returns>A PtrSize structure</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static PtrSize Create<T>(T value) where T : struct 
-        {
+        public static PtrSize Create<T>(T value) where T : struct
+        {            
             if (typeof(T) == typeof(ulong))
             {
                 return new PtrSize((ulong)(object)value, sizeof(ulong));

@@ -139,7 +139,8 @@ namespace Sparrow.Json
             _returnBuffer = context.GetManagedBuffer(out _pinnedBuffer);
             _buffer = _pinnedBuffer.Pointer;
 
-            _parserAuxiliarMemory = context.GetMemory(32);
+            _parserAuxiliarMemory = context.GetMemory(2);
+//            _parserAuxiliarMemory = context.GetMemory(32);
         }
 
         public int Position => _pos;

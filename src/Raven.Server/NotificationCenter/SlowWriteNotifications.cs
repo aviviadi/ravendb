@@ -92,7 +92,7 @@ namespace Raven.Server.NotificationCenter
                 if (details.Writes.Count > SlowWritesDetails.MaxNumberOfWrites)
                     details.Writes = details.Writes.OrderBy(x => x.Value.Date).TakeLast(SlowWritesDetails.MaxNumberOfWrites).ToDictionary(x => x.Key, x => x.Value);
 
-                _notificationCenter.Add(hint);
+                // _notificationCenter.Add(hint);
 
                 _updateNotificationInStorageRequired = false;
             }

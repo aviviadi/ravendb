@@ -30,7 +30,8 @@ namespace Sparrow.Json
     public class JsonOperationContext : PooledItem
     {
         private int _generation;
-        public const int InitialStreamSize = 4096;
+        public const int InitialStreamSize = 128;
+//        public const int InitialStreamSize = 4096;
         private const int MaxInitialStreamSize = 16 * 1024 * 1024;
         private readonly int _initialSize;
         private readonly int _longLivedSize;
@@ -272,6 +273,7 @@ namespace Sparrow.Json
             {
                 var buffer = pool.Allocate();
                 var handle = GCHandle.Alloc(buffer.Array, GCHandleType.Pinned);
+                Memory.RegisterVerification(handle.AddrOfPinnedObject(), new UIntPtr((uint)buffer.Array.Length), "GcHandleAlloc");
                 try
                 {
                     var ptr = (byte*)handle.AddrOfPinnedObject();
@@ -281,6 +283,7 @@ namespace Sparrow.Json
                 }
                 catch (Exception)
                 {
+                    Memory.UnregisterVerification(handle.AddrOfPinnedObject(), new UIntPtr((uint)buffer.Array.Length), "GcHandleFree");
                     handle.Free();
                     pool.Free(buffer);
                     throw;

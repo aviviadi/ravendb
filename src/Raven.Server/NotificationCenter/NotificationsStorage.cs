@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text;
 using Raven.Client.Util;
 using Raven.Server.Json;
 using Raven.Server.NotificationCenter.Notifications;
@@ -34,8 +35,10 @@ namespace Raven.Server.NotificationCenter
         {
             using (StorageEnvironment.GetStaticContext(out var ctx))
             {
-                Slice.From(ctx, "ByCreatedAt", ByteStringType.Immutable, out ByCreatedAt);
-                Slice.From(ctx, "ByPostponedUntil", ByteStringType.Immutable, out ByPostponedUntil);
+                var s1 = "ByCreatedAt";
+                var s2 = "ByPostponedUntil";
+                Slice.From(ctx, TableSchema.AddRegString(ref s1), ByteStringType.Immutable, out ByCreatedAt);
+                Slice.From(ctx, TableSchema.AddRegString(ref s2), ByteStringType.Immutable, out ByPostponedUntil);
             }
         }
 
@@ -390,8 +393,13 @@ namespace Raven.Server.NotificationCenter
 
         public static class NotificationsSchema
         {
-            public const string NotificationsTree = "Notifications";
+            public static readonly string NotificationsTree = "Notifications";            
 
+            static NotificationsSchema()
+            {
+                TableSchema.AddRegString(ref NotificationsTree);
+            }
+            
             public static class NotificationsTable
             {
 #pragma warning disable 169

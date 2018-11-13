@@ -11,11 +11,13 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using Sparrow;
 using Sparrow.Utils;
 using Voron.Data.BTrees;
 using Voron.Exceptions;
 using Voron.Impl.Journal;
 using Voron.Global;
+using Voron.Impl.FileHeaders;
 using Voron.Util;
 using Voron.Util.Settings;
 
@@ -345,10 +347,13 @@ namespace Voron.Impl.Backup
         private static void Restore(StorageEnvironment env, IEnumerable<ZipArchiveEntry> entries, VoronPathSetting tempDir, List<IDisposable> toDispose,
             LowLevelTransaction txw)
         {
+            IntPtr headerPtr = IntPtr.Zero;
             try
             {
                 TransactionHeader* lastTxHeader = null;
                 var lastTxHeaderStackLocation = stackalloc TransactionHeader[1];
+                headerPtr = new IntPtr(lastTxHeaderStackLocation);
+                Memory.RegisterVerification(headerPtr, new UIntPtr((ulong)sizeof(FileHeader)), "stackalloc");
 
                 long journalNumber = -1;
                 foreach (var entry in entries)
@@ -432,6 +437,7 @@ namespace Voron.Impl.Backup
             }
             finally
             {
+                Memory.RegisterVerification(headerPtr, new UIntPtr((ulong)sizeof(FileHeader)), "stackalloc");
                 toDispose.ForEach(x => x.Dispose());
 
                 try

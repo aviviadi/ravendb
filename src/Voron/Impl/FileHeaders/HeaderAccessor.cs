@@ -41,6 +41,8 @@ namespace Voron.Impl.FileHeaders
         public bool Initialize()
         {
             _locker.EnterWriteLock();
+            var f1ptr = IntPtr.Zero;
+            var f2ptr = IntPtr.Zero;
             try
             {
                 if (_theHeader == null)
@@ -49,6 +51,10 @@ namespace Voron.Impl.FileHeaders
                 var headers = stackalloc FileHeader[2];
                 var f1 = &headers[0];
                 var f2 = &headers[1];
+                f1ptr = new IntPtr(f1);
+                f2ptr = new IntPtr(f2);
+                Memory.RegisterVerification(new IntPtr((byte*)f1ptr), new UIntPtr((ulong)sizeof(FileHeader)), "stackalloc");
+                Memory.RegisterVerification(new IntPtr((byte*)f2ptr), new UIntPtr((ulong)sizeof(FileHeader)), "stackalloc");
                 var hasHeader1 = _env.Options.ReadHeader(HeaderFileNames[0], f1);
                 var hasHeader2 = _env.Options.ReadHeader(HeaderFileNames[1], f2);
                 if (hasHeader1 == false && hasHeader2 == false)
@@ -111,6 +117,7 @@ namespace Voron.Impl.FileHeaders
             }
             finally
             {
+                Memory.UnregisterVerification(new IntPtr((byte*)f1ptr), new UIntPtr((ulong)sizeof(FileHeader)), "stackalloc");
                 _locker.ExitWriteLock();
             }
         }

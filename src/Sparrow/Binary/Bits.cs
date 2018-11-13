@@ -1,9 +1,10 @@
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Sparrow.Binary
 {
     public static class Bits
-    {
+    {       
         //https://stackoverflow.com/questions/2709430/count-number-of-bits-in-a-64-bit-long-big-integer
         public static long NumberOfSetBits(long i)
         {
@@ -333,11 +334,12 @@ namespace Sparrow.Binary
         public static int SwapBytes(int value)
         {
             return (int) SwapBytes((uint) value);
-        }
-
+        }     
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static long SwapBytes(long value)
         {
+            
             return (long)SwapBytes((ulong)value);
         }
 

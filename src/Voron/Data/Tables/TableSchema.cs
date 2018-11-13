@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text;
 using Sparrow.Binary;
 using Sparrow.Collections;
 using Voron.Data.BTrees;
@@ -39,19 +40,40 @@ namespace Voron.Data.Tables
 
         public byte TableType { get; set; }
 
+        public static ref string AddRegString(ref string s1)
+        {
+            fixed (char* ptr = s1)
+            {                
+                int length = Encoding.Unicode.GetByteCount(s1);
+//                Console.WriteLine(new IntPtr(ptr).ToInt64() + "/" + length);
+                Memory.RegisterVerification(new IntPtr(ptr), new UIntPtr((ulong)length), "static slice");
+            }
+
+            return ref s1;
+        }
+
         static TableSchema()
         {
             using (StorageEnvironment.GetStaticContext(out var ctx))
             {
-                Slice.From(ctx, "Active-Section", ByteStringType.Immutable, 
+                var s1 = "Active-Section";
+//                Console.WriteLine("ActiveSlice=");
+                Slice.From(ctx, AddRegString(ref s1), ByteStringType.Immutable, 
                     out ActiveSectionSlice);
-                Slice.From(ctx, "Inactive-Section", ByteStringType.Immutable,
+                Console.Out.Flush();
+                var s2 = "Inactive-Section";
+                Slice.From(ctx, AddRegString(ref s2), ByteStringType.Immutable,
                     out InactiveSectionSlice);
-                Slice.From(ctx, "Active-Candidate-Section", ByteStringType.Immutable,
+
+                var s3 = "Active-Candidate-Section";
+                Slice.From(ctx, AddRegString(ref s3), ByteStringType.Immutable,
                     out ActiveCandidateSectionSlice);
-                Slice.From(ctx, "Stats", ByteStringType.Immutable, out StatsSlice);
-                Slice.From(ctx, "Schemas", ByteStringType.Immutable, out SchemasSlice);
-                Slice.From(ctx, "PK", ByteStringType.Immutable, out PkSlice);
+                var s4 = "Stats";
+                Slice.From(ctx, AddRegString(ref s4), ByteStringType.Immutable, out StatsSlice);
+                var s5 = "Schemas";
+                Slice.From(ctx, AddRegString(ref s5), ByteStringType.Immutable, out SchemasSlice);
+                var s6 = "PK";
+                Slice.From(ctx, AddRegString(ref s6), ByteStringType.Immutable, out PkSlice);
             }
         }
 
@@ -178,7 +200,9 @@ namespace Voron.Data.Tables
 
                 fixed (byte* destination = serialized)
                 {
+                    Memory.RegisterVerification(new IntPtr((byte*)destination), new UIntPtr((ulong)serializer.Size), "fixed");
                     serializer.CopyTo(destination);
+                    Memory.UnregisterVerification(new IntPtr((byte*)destination), new UIntPtr((ulong)serializer.Size), "fixed");
                 }
 
                 return serialized;
@@ -275,7 +299,9 @@ namespace Voron.Data.Tables
 
                 fixed (byte* destination = serialized)
                 {
+                    Memory.RegisterVerification(new IntPtr((byte*)destination), new UIntPtr((ulong)serializer.Size), "fixed");
                     serializer.CopyTo(destination);
+                    Memory.UnregisterVerification(new IntPtr((byte*)destination), new UIntPtr((ulong)serializer.Size), "fixed");
                 }
 
                 return serialized;
@@ -401,66 +427,75 @@ namespace Voron.Data.Tables
             using (var rawDataActiveSection = ActiveRawDataSmallSection.Create(tx.LowLevelTransaction, name, TableType, sizeInPages))
             {
                 long val = rawDataActiveSection.PageNumber;
-                Slice pageNumber;
-                using (
-                    Slice.External(tx.Allocator, (byte*)&val, sizeof(long), ByteStringType.Immutable, out pageNumber))
+                var valPtr = (byte*)&val;
+                Memory.RegisterVerification(new IntPtr(valPtr), new UIntPtr(8UL), "stackalloc");
+                try
                 {
-                    tableTree.Add(ActiveSectionSlice, pageNumber);
-                }
-
-                byte* ptr;
-                using (tableTree.DirectAdd(StatsSlice, sizeof(TableSchemaStats), out ptr))
-                {
-                    var stats = (TableSchemaStats*)ptr;
-                    stats->NumberOfEntries = 0;
-                }
-
-                var tablePageAllocator = new NewPageAllocator(tx.LowLevelTransaction, tableTree);
-                tablePageAllocator.Create();
-
-                var globalPageAllocator = new NewPageAllocator(tx.LowLevelTransaction,
-                    tx.LowLevelTransaction.RootObjects);
-                globalPageAllocator.Create();
-
-                if (_primaryKey != null)
-                {
-                    if (_primaryKey.IsGlobal == false)
+                    Slice pageNumber;
+                    using (
+                        Slice.External(tx.Allocator, (byte*)&val, sizeof(long), ByteStringType.Immutable, out pageNumber))
                     {
+                        tableTree.Add(ActiveSectionSlice, pageNumber);
+                    }
 
-                        using (var indexTree = Tree.Create(tx.LowLevelTransaction, tx, _primaryKey.Name, isIndexTree: true, newPageAllocator: tablePageAllocator))
+                    byte* ptr;
+                    using (tableTree.DirectAdd(StatsSlice, sizeof(TableSchemaStats), out ptr))
+                    {
+                        var stats = (TableSchemaStats*)ptr;
+                        stats->NumberOfEntries = 0;
+                    }
+
+                    var tablePageAllocator = new NewPageAllocator(tx.LowLevelTransaction, tableTree);
+                    tablePageAllocator.Create();
+
+                    var globalPageAllocator = new NewPageAllocator(tx.LowLevelTransaction,
+                        tx.LowLevelTransaction.RootObjects);
+                    globalPageAllocator.Create();
+
+                    if (_primaryKey != null)
+                    {
+                        if (_primaryKey.IsGlobal == false)
                         {
-                            using (tableTree.DirectAdd(_primaryKey.Name, sizeof(TreeRootHeader), out ptr))
+
+                            using (var indexTree = Tree.Create(tx.LowLevelTransaction, tx, _primaryKey.Name, isIndexTree: true, newPageAllocator: tablePageAllocator))
                             {
-                                indexTree.State.CopyTo((TreeRootHeader*)ptr);
+                                using (tableTree.DirectAdd(_primaryKey.Name, sizeof(TreeRootHeader), out ptr))
+                                {
+                                    indexTree.State.CopyTo((TreeRootHeader*)ptr);
+                                }
                             }
                         }
-                    }
-                    else
-                    {
-                        tx.CreateTree(_primaryKey.Name.ToString(), isIndexTree: true, newPageAllocator: globalPageAllocator);
-                    }
-                }
-
-                foreach (var indexDef in _indexes.Values)
-                {
-                    if (indexDef.IsGlobal == false)
-                    {
-                        using (var indexTree = Tree.Create(tx.LowLevelTransaction, tx, indexDef.Name, isIndexTree: true, newPageAllocator: tablePageAllocator))
+                        else
                         {
-                            using (tableTree.DirectAdd(indexDef.Name, sizeof(TreeRootHeader), out ptr))
-                            {
-                                indexTree.State.CopyTo((TreeRootHeader*)ptr);
-                            }
+                            tx.CreateTree(_primaryKey.Name.ToString(), isIndexTree: true, newPageAllocator: globalPageAllocator);
                         }
                     }
-                    else
-                    {
-                        tx.CreateTree(indexDef.Name.ToString(), isIndexTree: true, newPageAllocator: globalPageAllocator);
-                    }
-                }
 
-                // Serialize the schema into the table's tree
-                SerializeSchemaIntoTableTree(tableTree);
+                    foreach (var indexDef in _indexes.Values)
+                    {
+                        if (indexDef.IsGlobal == false)
+                        {
+                            using (var indexTree = Tree.Create(tx.LowLevelTransaction, tx, indexDef.Name, isIndexTree: true, newPageAllocator: tablePageAllocator))
+                            {
+                                using (tableTree.DirectAdd(indexDef.Name, sizeof(TreeRootHeader), out ptr))
+                                {
+                                    indexTree.State.CopyTo((TreeRootHeader*)ptr);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            tx.CreateTree(indexDef.Name.ToString(), isIndexTree: true, newPageAllocator: globalPageAllocator);
+                        }
+                    }
+
+                    // Serialize the schema into the table's tree
+                    SerializeSchemaIntoTableTree(tableTree);
+                }
+                finally
+                {
+                    Memory.UnregisterVerification(new IntPtr(valPtr), new UIntPtr(8UL), "stackalloc");
+                }
             }
         }
 
@@ -472,7 +507,10 @@ namespace Voron.Data.Tables
             {
                 fixed (byte* source = serializer)
                 {
+                    Memory.RegisterVerification(new IntPtr((byte*)source), new UIntPtr((ulong)serializer.Length), "fixed");
                     Memory.Copy(ptr, source, serializer.Length);
+                    Memory.UnregisterVerification(new IntPtr((byte*)source), new UIntPtr((ulong)serializer.Length), "fixed");
+                    
                 }
             }
         }
@@ -511,23 +549,34 @@ namespace Voron.Data.Tables
 
             fixed (byte* ptr = packed)
             {
-                var serializer = new TableValueBuilder();
-
-                foreach (var member in structure)
+                Memory.RegisterVerification(ptr, (ulong)packed.Length, "fixed");
+                try
                 {
-                    member.CopyTo(packed, position);
-                    serializer.Add(&ptr[position], member.Length);
-                    position += member.Length;
+                    var serializer = new TableValueBuilder();
+                    
+                    foreach (var member in structure)
+                    {
+                        member.CopyTo(packed, position);
+                        serializer.Add(&ptr[position], member.Length);
+                        position += member.Length;
+                    }
+
+                    var output = new byte[serializer.Size];
+
+                    fixed (byte* outputPtr = output)
+                    {
+                        Memory.RegisterVerification(new IntPtr((byte*)outputPtr), new UIntPtr((ulong)serializer.Size), "ref");
+                        serializer.CopyTo(outputPtr);
+                        Memory.UnregisterVerification(new IntPtr((byte*)outputPtr), new UIntPtr((ulong)serializer.Size), "ref");
+
+                    }
+
+                    return output;
                 }
-
-                var output = new byte[serializer.Size];
-
-                fixed (byte* outputPtr = output)
+                finally
                 {
-                    serializer.CopyTo(outputPtr);
+                    Memory.UnregisterVerification(ptr, (ulong)packed.Length, "fixed");
                 }
-
-                return output;
             }
         }
 

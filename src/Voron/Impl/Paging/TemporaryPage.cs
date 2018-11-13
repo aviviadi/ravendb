@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using Sparrow;
 using Voron.Global;
 using Voron.Data.BTrees;
 
@@ -18,6 +19,7 @@ namespace Voron.Impl.Paging
             PageSize = pageSize ?? Constants.Storage.PageSize;
             _tempPageBuffer = new byte[PageSize];
             _tempPageHandle = GCHandle.Alloc(_tempPageBuffer, GCHandleType.Pinned);
+            Memory.RegisterVerification(_tempPageHandle.AddrOfPinnedObject(), new UIntPtr((uint)_tempPageBuffer.Length), "GcHandleAlloc");
             _tempPage = _tempPageHandle.AddrOfPinnedObject();
         }
 
@@ -31,6 +33,7 @@ namespace Voron.Impl.Paging
         {
             if (_tempPageHandle.IsAllocated)
             {
+                Memory.UnregisterVerification(_tempPageHandle.AddrOfPinnedObject(), new UIntPtr((uint)_tempPageBuffer.Length), "GcHandleFree");
                 _tempPageHandle.Free();
             }
         }

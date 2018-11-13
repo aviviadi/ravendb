@@ -105,7 +105,7 @@ namespace SlowTests.Voron.Storage
                 return;
             if (StorageEnvironmentOptions.RunningOnPosix)
             {
-                Syscall.munmap(new IntPtr(adjacentBlockAddress), (UIntPtr)16);
+                Syscall.munmap_withVerification(new IntPtr(adjacentBlockAddress), (UIntPtr)16);
                 return;
             }
             Win32MemoryProtectMethods.VirtualFree(adjacentBlockAddress, UIntPtr.Zero, Win32MemoryProtectMethods.FreeType.MEM_RELEASE);

@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading;
 using Raven.Client.Documents.Indexes;
 using Raven.Client.Documents.Operations;
@@ -501,7 +502,7 @@ namespace Raven.Server.Smuggler.Documents
             return result.RevisionDocuments;
         }
 
-        private SmugglerProgressBase.Counts ProcessDocuments(SmugglerResult result, BuildVersionType buildType)
+        private unsafe SmugglerProgressBase.Counts ProcessDocuments(SmugglerResult result, BuildVersionType buildType)
         {
             using (var actions = _destination.Documents())
             {

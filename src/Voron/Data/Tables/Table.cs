@@ -627,39 +627,47 @@ namespace Voron.Data.Tables
             AssertWritableTable();
 
             var pk = _schema.Key;
-            using (Slice.External(_tx.Allocator, (byte*)&id, sizeof(long), out Slice idAsSlice))
+            Memory.RegisterVerification(new IntPtr((byte*)&id), new UIntPtr(8UL), "ref");
+            try
             {
-                if (pk != null)
+                using (Slice.External(_tx.Allocator, (byte*)&id, sizeof(long), out Slice idAsSlice))
                 {
-                    using (pk.GetSlice(_tx.Allocator, ref value, out Slice pkVal))
+                    if (pk != null)
                     {
-                        var pkIndex = GetTree(pk);
-
-                        using (pkIndex.DirectAdd(pkVal, idAsSlice.Size, TreeNodeFlags.Data | TreeNodeFlags.NewOnly, out var ptr))
+                        using (pk.GetSlice(_tx.Allocator, ref value, out Slice pkVal))
                         {
-                            idAsSlice.CopyTo(ptr);
+                            var pkIndex = GetTree(pk);
+
+                            using (pkIndex.DirectAdd(pkVal, idAsSlice.Size, TreeNodeFlags.Data | TreeNodeFlags.NewOnly, out var ptr))
+                            {
+                                idAsSlice.CopyTo(ptr);
+                            }
                         }
                     }
-                }
 
-                foreach (var indexDef in _schema.Indexes.Values)
-                {
-                    // For now we wont create secondary indexes on Compact trees.
-                    using (indexDef.GetSlice(_tx.Allocator, ref value, out Slice val))
+                    foreach (var indexDef in _schema.Indexes.Values)
                     {
-                        var indexTree = GetTree(indexDef);
-                        var index = GetFixedSizeTree(indexTree, val, 0);
-                        index.Add(id);
+                        // For now we wont create secondary indexes on Compact trees.
+                        using (indexDef.GetSlice(_tx.Allocator, ref value, out Slice val))
+                        {
+                            var indexTree = GetTree(indexDef);
+                            var index = GetFixedSizeTree(indexTree, val, 0);
+                            index.Add(id);
+                        }
+                    }
+
+                    foreach (var indexDef in _schema.FixedSizeIndexes.Values)
+                    {
+                        var index = GetFixedSizeTree(indexDef);
+                        var key = indexDef.GetValue(ref value);
+                        if (index.Add(key, idAsSlice) == false)
+                            ThrowInvalidDuplicateFixedSizeTreeKey(key, indexDef);
                     }
                 }
-
-                foreach (var indexDef in _schema.FixedSizeIndexes.Values)
-                {
-                    var index = GetFixedSizeTree(indexDef);
-                    var key = indexDef.GetValue(ref value);
-                    if (index.Add(key, idAsSlice) == false)
-                        ThrowInvalidDuplicateFixedSizeTreeKey(key, indexDef);
-                }
+            }
+            finally
+            {
+                Memory.UnregisterVerification(new IntPtr((byte*)&id), new UIntPtr(8UL), "ref");
             }
         }
 
@@ -732,14 +740,23 @@ namespace Voron.Data.Tables
                 _activeDataSmallSection = ActiveRawDataSmallSection.Create(_tx.LowLevelTransaction, Name, _tableType, newNumberOfPages);
                 _activeDataSmallSection.DataMoved += OnDataMoved;
                 var val = _activeDataSmallSection.PageNumber;
-                using (Slice.External(_tx.Allocator, (byte*)&val, sizeof(long), out Slice pageNumber))
+                var pVal = &val;
+                Memory.RegisterVerification(new IntPtr(pVal), new UIntPtr(8UL), "stack");
+                try
                 {
-                    _tableTree.Add(TableSchema.ActiveSectionSlice, pageNumber);
+                    using (Slice.External(_tx.Allocator, (byte*)&val, sizeof(long), out Slice pageNumber))
+                    {
+                        _tableTree.Add(TableSchema.ActiveSectionSlice, pageNumber);
+                    }
+
+                    var allocationResult = _activeDataSmallSection.TryAllocate(size, out id);
+
+                    Debug.Assert(allocationResult);
                 }
-
-                var allocationResult = _activeDataSmallSection.TryAllocate(size, out id);
-
-                Debug.Assert(allocationResult);
+                finally
+                {
+                    Memory.UnregisterVerification(new IntPtr(pVal), new UIntPtr(8UL), "stack");
+                }
             }
             AssertNoReferenceToThisPage(builder, id);
             return id;
@@ -1283,10 +1300,18 @@ namespace Voron.Data.Tables
         private void GetTableValueReader(FixedSizeTree.IFixedSizeIterator it, out TableValueReader reader)
         {
             long id;
-            using (it.Value(out Slice slice))
-                slice.CopyTo((byte*)&id);
-            var ptr = DirectRead(id, out int size);
-            reader = new TableValueReader(id, ptr, size);
+            Memory.RegisterVerification(new IntPtr(&id), new UIntPtr(8UL), "on the stack");
+            try
+            {
+                using (it.Value(out Slice slice))
+                    slice.CopyTo((byte*)&id);
+                var ptr = DirectRead(id, out int size);
+                reader = new TableValueReader(id, ptr, size);
+            }
+            finally
+            {
+                Memory.UnregisterVerification(new IntPtr(&id), new UIntPtr(8UL), "on the stack");
+            }
         }
 
 
@@ -1297,29 +1322,38 @@ namespace Voron.Data.Tables
             reader = new TableValueReader(id, ptr, size);
         }
 
-        public bool Set(TableValueBuilder builder, bool forceUpdate = false)
+        public unsafe bool Set(TableValueBuilder builder, bool forceUpdate = false)
         {
             AssertWritableTable();
 
             // The ids returned from this function MUST NOT be stored outside of the transaction.
             // These are merely for manipulation within the same transaction, and WILL CHANGE afterwards.
-            long id;
-            bool exists;
-
-            using (builder.SliceFromLocation(_tx.Allocator, _schema.Key.StartIndex, out Slice key))
+            long id = 0;
+            var ptr = &id;
+            Memory.RegisterVerification(new IntPtr(ptr), new UIntPtr(8UL), "on the stack");
+            try
             {
-                exists = TryFindIdFromPrimaryKey(key, out id);
-            }
+                bool exists;
 
-            if (exists)
+                using (builder.SliceFromLocation(_tx.Allocator, _schema.Key.StartIndex, out Slice key))
+                {
+                    exists = TryFindIdFromPrimaryKey(key, out id);
+                }
+
+                if (exists)
+                {
+                    Update(id, builder, forceUpdate);
+                    return false;
+                }
+
+                Insert(builder);
+                return true;
+            }
+            finally
             {
-                Update(id, builder, forceUpdate);
-                return false;
+                Memory.UnregisterVerification(new IntPtr(ptr), new UIntPtr(8UL), "on the stack");
             }
-
-            Insert(builder);
-            return true;
-        }
+        }    
 
         public int DeleteBackwardFrom(TableSchema.FixedSizeSchemaIndexDef index, long value, long numberOfEntriesToDelete)
         {

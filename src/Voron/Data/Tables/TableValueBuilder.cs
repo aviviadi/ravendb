@@ -162,14 +162,18 @@ namespace Voron.Data.Tables
                 {
                     value = p.Value;
                     srcPtr = (byte*)&value; // This generates an alias on value
+                    Memory.RegisterVerification(new IntPtr((byte*)srcPtr), new UIntPtr((ulong)sizeof(ulong)), "stack");
                 }
                 else
-                {
+                {                                       
                     srcPtr = p.Ptr;                    
                 }
 
                 Memory.Copy(dataStart, srcPtr, p.Size);
 
+                if (_values[i].IsValue)
+                    Memory.UnregisterVerification(new IntPtr((byte*)srcPtr), new UIntPtr((ulong)sizeof(ulong)), "stack");
+                
                 dataStart += p.Size;
                 value = 0; // This ensures there cannot be any JIT optimization that could reuse the memory location.          
             }

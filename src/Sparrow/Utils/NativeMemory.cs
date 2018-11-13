@@ -90,6 +90,7 @@ namespace Sparrow.Utils
             {
                 Interlocked.Add(ref stats.ReleasesFromOtherThreads, size);
             }
+            Memory.UnregisterVerification(new IntPtr(ptr), new UIntPtr((ulong)size), "FreeHGlobal");
             Marshal.FreeHGlobal((IntPtr)ptr);
         }
 
@@ -118,6 +119,7 @@ namespace Sparrow.Utils
             try
             {
                 var ptr = (byte*)Marshal.AllocHGlobal((IntPtr)size).ToPointer();
+                Memory.RegisterVerification(new IntPtr(ptr), new UIntPtr((ulong)size), "AllocHGlobal");
                 thread.Allocations += size;
                 return ptr;
             }

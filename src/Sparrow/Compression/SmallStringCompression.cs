@@ -161,60 +161,81 @@ namespace Sparrow.Compression
         {
             // we use stackalloc here so we can send a single state parameter
             // to the Flush method, and not have to allocate a value on the heap
-            var state = stackalloc CompressionState[1];
-            int h1, h2 = 0, h3 = 0;
-            for (int i = 0; i < inputLen; i++)
+            IntPtr statePtr = IntPtr.Zero;
+            try
             {
-                h1 = input[i] << 3;
-                if (i + 1 < inputLen)
-                    h2 = h1 + input[i + 1];
-                if (i + 2 < inputLen)
-                    h3 = h2 ^ input[i + 2];
-
-                int size = _maxTermSize;
-                if (i + size >= inputLen)
-                    size = inputLen - i;
-                var foundMatch = false;
-                for (; size > 0 && foundMatch == false; size--)
+                var state = stackalloc CompressionState[1];
+                statePtr = new IntPtr(state);
+                Memory.RegisterVerification(statePtr, new UIntPtr((ulong)sizeof(CompressionState)), "stackalloc");
+                int h1, h2 = 0, h3 = 0;
+                for (int i = 0; i < inputLen; i++)
                 {
-                    byte*[] slot;
-                    switch (size)
-                    {
-                        case 1: slot = _hashTable[h1 % _hashTable.Length]; break;
-                        case 2: slot = _hashTable[h2 % _hashTable.Length]; break;
-                        default: slot = _hashTable[h3 % _hashTable.Length]; break;
-                    }
-                    if (slot == null)
-                        continue;
-                    for (int j = 0; j < slot.Length; j++)
-                    {
-                        var termLegnth = slot[j][0];
-                        if (termLegnth != size ||
-                            Memory.Compare(input + i, slot[j] + 1, size) != 0)
-                        {
-                            continue;
-                        }
-                        if (state->OutputPosition + state->VerbatimLength + 1 > outputLen)
-                            return 0;
-                        if (state->VerbatimLength > 0)
-                        {
-                            Flush(input, output, state);
-                        }
-                        output[state->OutputPosition++] = slot[j][termLegnth + 1]; // get the index to write there
-                        state->VerbatimStart = i + termLegnth;
-                        i += termLegnth - 1; // skip the length we just compressed
+                    h1 = input[i] << 3;
+                    if (i + 1 < inputLen)
+                        h2 = h1 + input[i + 1];
+                    if (i + 2 < inputLen)
+                        h3 = h2 ^ input[i + 2];
 
-                        foundMatch = true;
-                        break;
+                    int size = _maxTermSize;
+                    if (i + size >= inputLen)
+                        size = inputLen - i;
+                    var foundMatch = false;
+                    for (; size > 0 && foundMatch == false; size--)
+                    {
+                        byte*[] slot;
+                        switch (size)
+                        {
+                            case 1:
+                                slot = _hashTable[h1 % _hashTable.Length];
+                                break;
+                            case 2:
+                                slot = _hashTable[h2 % _hashTable.Length];
+                                break;
+                            default:
+                                slot = _hashTable[h3 % _hashTable.Length];
+                                break;
+                        }
+
+                        if (slot == null)
+                            continue;
+                        for (int j = 0; j < slot.Length; j++)
+                        {
+                            var termLegnth = slot[j][0];
+                            if (termLegnth != size ||
+                                Memory.Compare(input + i, slot[j] + 1, size) != 0)
+                            {
+                                continue;
+                            }
+
+                            if (state->OutputPosition + state->VerbatimLength + 1 > outputLen)
+                                return 0;
+                            if (state->VerbatimLength > 0)
+                            {
+                                Flush(input, output, state);
+                            }
+
+                            output[state->OutputPosition++] = slot[j][termLegnth + 1]; // get the index to write there
+                            state->VerbatimStart = i + termLegnth;
+                            i += termLegnth - 1; // skip the length we just compressed
+
+                            foundMatch = true;
+                            break;
+                        }
                     }
+
+                    if (foundMatch == false)
+                        state->VerbatimLength++;
                 }
-                if (foundMatch == false)
-                    state->VerbatimLength++;
+
+                if (state->OutputPosition + state->VerbatimLength > outputLen)
+                    return 0;
+                Flush(input, output, state);
+                return state->OutputPosition;
             }
-            if (state->OutputPosition + state->VerbatimLength > outputLen)
-                return 0;
-            Flush(input, output, state);
-            return state->OutputPosition;
+            finally
+            {
+                Memory.UnregisterVerification(statePtr, new UIntPtr((ulong)sizeof(CompressionState)), "stackalloc");
+            }
         }
 
         private void Flush(byte* input, byte* output, CompressionState* state)

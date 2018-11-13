@@ -2,8 +2,11 @@
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Text;
+using System.Threading;
 using Sparrow.Binary;
 using Sparrow.Json.Parsing;
+using static Sparrow.Json.Parsing.UnmanagedJsonParser;
 
 namespace Sparrow.Json
 {
@@ -51,7 +54,7 @@ namespace Sparrow.Json
 
             if (_buffer.Length - Used > count)
             {
-                Unsafe.CopyBlock(_buffer.Pointer + Used, buffer, (uint)count);
+                Memory.Copy(_buffer.Pointer + Used, buffer, (uint)count);
                 _sizeInBytes += count;
                 Used += count;
             }
@@ -76,7 +79,7 @@ namespace Sparrow.Json
 
                 var bytesToWrite = Math.Min(lengthLeft, _buffer.Length - Used);
 
-                Unsafe.CopyBlock(_buffer.Pointer + Used, buffer, (uint)bytesToWrite);
+                Memory.Copy/*ADIADI::Mem*/(_buffer.Pointer + Used, buffer, (uint)bytesToWrite);
 
                 _sizeInBytes += bytesToWrite;
                 lengthLeft -= bytesToWrite;
@@ -174,7 +177,18 @@ namespace Sparrow.Json
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public Segment ShallowCopy()
             {
-                return (Segment)MemberwiseClone();
+                // lets try deep copy
+                Segment newSegment = new Segment
+                {
+                    AccumulatedSizeInBytes = AccumulatedSizeInBytes,
+                    Address = Address,
+                    Allocation = Allocation,
+                    DeallocationPendingPrevious = DeallocationPendingPrevious,
+                    Previous = Previous,
+                    Used = Used
+                };
+                return newSegment;
+                // return (Segment)MemberwiseClone();
             }
 
 #if DEBUG
@@ -211,6 +225,7 @@ namespace Sparrow.Json
         // Since we never know which instance actually ran the Dispose, it is 
         // possible that this particular copy may have _head != null.
         public bool IsDisposed => _head == null || _head.Address == null;
+        // public string Sb { get; set; }
 
         public UnmanagedWriteBuffer(JsonOperationContext context, AllocatedMemoryData allocatedMemoryData)
         {
@@ -232,6 +247,8 @@ namespace Sparrow.Json
             AllocatedBy = Environment.StackTrace;
             FreedBy = null;
 #endif
+            // Sb = null;
+            cnt = 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -258,29 +275,86 @@ namespace Sparrow.Json
 #endif
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int cnt;
+        
+        [MethodImpl(MethodImplOptions.NoOptimization)]
         public void Write(byte* buffer, int count)
         {
-            Debug.Assert(count >= 0); // count is a size
-            Debug.Assert(buffer + count >= buffer); // overflow check
-            ThrowOnDisposed();
+//            var c = Interlocked.Increment(ref cnt);
+//            try
+//            {
+//                if (c > 1)
+//                {
+//                    Console.WriteLine("Ahh");
+//                    Console.Out.Flush();
+//                }
 
-            if (count == 0)
-                return;
+//                Debug.Assert(count >= 0); // count is a size
+//                Debug.Assert(buffer + count >= buffer); // overflow check
+//                if (count < 0 || buffer + count < buffer)
+//                {
+//                    throw new Exception($"hah {count}");
+//                }
 
-            var head = _head;
-            if (head.Allocation.SizeInBytes - head.Used > count)
-            {
-                Unsafe.CopyBlock(head.Address + head.Used, buffer, (uint)count);
-                head.AccumulatedSizeInBytes += count;
-                head.Used += count;
-            }
-            else
-                WriteUnlikely(buffer, count);
+            
+//                ThrowOnDisposed();
+                // if (Sb != null)
+                //     Sb += ($"[Write::{Thread.CurrentThread.ManagedThreadId}]");
+
+                if (count == 0)
+                {
+//                    if (Sb != null)
+//                    {
+//                        Console.WriteLine("Count == 0 | " + Sb.ToString());
+//                        Console.Out.Flush();
+//                    }
+
+                    return;
+                }
+            
+//            Console.WriteLine($"in {Thread.CurrentThread.ManagedThreadId}");
+//            Console.Out.Flush();
+                var head = _head;
+                if (head.Allocation.SizeInBytes - head.Used > count)
+                {
+//                    var ptr = new IntPtr(&buffer).ToInt64();
+//                    var address = new IntPtr(head.Address).ToInt64();
+//                    if (Sb != null)
+//                    {
+//                        Sb += ($"[Copy::({address}+{head.Used},{head.Allocation.SizeInBytes},{ptr},{(uint)count})][END]");
+//                        Console.WriteLine(Sb);
+//                        Console.Out.Flush();
+//                    }
+//
+//                    Sb = null;
+//                    Console.WriteLine($"ou {Thread.CurrentThread.ManagedThreadId}");
+//                    Console.Out.Flush();
+                    Memory.Copy(head.Address + head.Used, buffer, (uint)count);
+                    head.AccumulatedSizeInBytes += count;
+                    head.Used += count;
+                }
+                else
+                    WriteUnlikely(buffer, count);
+
+                // Console.WriteLine($"ou {Thread.CurrentThread.ManagedThreadId}");
+                // Console.Out.Flush();
+//            }
+//            finally
+//            {
+//                var cc = Interlocked.Decrement(ref cnt);
+//                if (cc != 0)
+//                {
+//                    Console.WriteLine("bllaaa");
+//                    Console.Out.Flush();
+//                }
+//            }
         }
-
+        
+        [MethodImpl(MethodImplOptions.NoOptimization)]
         private void WriteUnlikely(byte* buffer, int count)
         {
+//            Console.WriteLine($"IN {Thread.CurrentThread.ManagedThreadId}");
+//            Console.Out.Flush();
             Debug.Assert(count >= 0); // count is a size
             Debug.Assert(buffer + count >= buffer); // overflow check
 
@@ -298,7 +372,7 @@ namespace Sparrow.Json
 
                 // Write as much as we can in the current Segment
                 var amountWrittenInRound = Math.Min(amountPending, availableSpace);
-                Unsafe.CopyBlock(head.Address + head.Used, buffer, (uint)amountWrittenInRound);
+                Memory.Copy/*ADIADI::Mem*/(head.Address + head.Used, buffer, (uint)amountWrittenInRound);
 
                 // Update Segment invariants
                 head.AccumulatedSizeInBytes += amountWrittenInRound;
@@ -308,6 +382,8 @@ namespace Sparrow.Json
                 amountPending -= amountWrittenInRound;
                 buffer += amountWrittenInRound;
             } while (amountPending > 0);
+//            Console.WriteLine($"OU {Thread.CurrentThread.ManagedThreadId}");
+//            Console.Out.Flush();
         }
 
         private void AllocateNextSegment(int required, bool allowGrowth)

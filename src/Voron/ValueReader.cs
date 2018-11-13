@@ -52,7 +52,12 @@ namespace Voron
         public int Read(byte[] buffer, int offset, int count)
         {
             fixed (byte* b = buffer)
-                return Read(b + offset, count);
+            {
+                Memory.RegisterVerification(new IntPtr((byte*)b), new UIntPtr((ulong)buffer.Length), "fixed");
+                var rc = Read(b + offset, count);
+                Memory.UnregisterVerification(new IntPtr((byte*)b), new UIntPtr((ulong)buffer.Length), "fixed");
+                return rc;
+            }
         }
 
         public void Skip(int size)

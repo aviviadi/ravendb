@@ -10,6 +10,7 @@ using Raven.Server.ServerWide;
 using Sparrow.Collections;
 using Sparrow.Json.Parsing;
 using Sparrow.Logging;
+using Voron.Data.Tables;
 
 namespace Raven.Server.NotificationCenter
 {
@@ -54,7 +55,7 @@ namespace Raven.Server.NotificationCenter
         public readonly NotificationCenterOptions Options;
 
         public void Add(Notification notification, DateTime? postponeUntil = null, bool updateExisting = true)
-        {
+        {            
             try
             {
                 if (notification.IsPersistent)

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Text;
 using Sparrow.Utils;
 using Bits = Sparrow.Binary.Bits;
 
@@ -105,7 +106,13 @@ namespace Sparrow
             fixed (char* pX = x.Buffer)
             fixed (char* pY = y.Buffer)
             {
-                return Memory.Compare((byte*)pX + x.Offset * sizeof(char), (byte*)pY + y.Offset * sizeof(char), x.Length * sizeof(char)) == 0;
+                Memory.RegisterVerification(new IntPtr((byte*)pX), new UIntPtr((ulong)Encoding.Unicode.GetByteCount(x.Buffer)), "fixed");
+                Memory.RegisterVerification(new IntPtr((byte*)pY), new UIntPtr((ulong)Encoding.Unicode.GetByteCount(y.Buffer)), "fixed");
+                // Console.WriteLine($"{Encoding.Unicode.GetByteCount(x.Buffer)},{Encoding.Unicode.GetByteCount(y.Buffer)}:{x.Offset},{y.Offset},{sizeof(char)},{x.Length}");
+                var rc =  Memory.Compare((byte*)pX + x.Offset * sizeof(char), (byte*)pY + y.Offset * sizeof(char), x.Length * sizeof(char)) == 0;
+                Memory.UnregisterVerification(new IntPtr((byte*)pX), new UIntPtr((ulong)Encoding.Unicode.GetByteCount(x.Buffer)), "fixed");
+                Memory.UnregisterVerification(new IntPtr((byte*)pY), new UIntPtr((ulong)Encoding.Unicode.GetByteCount(y.Buffer)), "fixed");
+                return rc;
             }
 
         }
@@ -263,7 +270,12 @@ namespace Sparrow
             fixed (char* pSelf = Buffer)
             fixed (char* pOther = other)
             {
-                return Memory.Compare((byte*)pSelf + Offset * sizeof(char), (byte*)pOther, Length * sizeof(char)) == 0;
+                Memory.RegisterVerification(new IntPtr((byte*)pSelf), new UIntPtr((ulong)Buffer.Length), "fixed");
+                Memory.RegisterVerification(new IntPtr((byte*)pOther), new UIntPtr((ulong)other.Length), "fixed");
+                var rc = Memory.Compare((byte*)pSelf + Offset * sizeof(char), (byte*)pOther, Length * sizeof(char)) == 0;
+                Memory.UnregisterVerification(new IntPtr((byte*)pSelf), new UIntPtr((ulong)Buffer.Length), "fixed");
+                Memory.UnregisterVerification(new IntPtr((byte*)pOther), new UIntPtr((ulong)other.Length), "fixed");
+                return rc;
             }
         }
 
@@ -286,7 +298,12 @@ namespace Sparrow
             fixed (char* pSelf = Buffer)
             fixed (char* pOther = other.Buffer)
             {
-                return Memory.Compare((byte*)pSelf + Offset * sizeof(char), (byte*)pOther + other.Offset * sizeof(char), Length * sizeof(char)) == 0;
+                Memory.RegisterVerification(new IntPtr((byte*)pSelf), new UIntPtr((ulong)Buffer.Length), "fixed");
+                Memory.RegisterVerification(new IntPtr((byte*)pOther), new UIntPtr((ulong)other.Buffer.Length), "fixed");
+                var rc = Memory.Compare((byte*)pSelf + Offset * sizeof(char), (byte*)pOther + other.Offset * sizeof(char), Length * sizeof(char)) == 0;
+                Memory.UnregisterVerification(new IntPtr((byte*)pSelf), new UIntPtr((ulong)Buffer.Length), "fixed");
+                Memory.UnregisterVerification(new IntPtr((byte*)pOther), new UIntPtr((ulong)other.Buffer.Length), "fixed");
+                return rc;
             }
         }
 

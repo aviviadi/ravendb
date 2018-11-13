@@ -176,7 +176,7 @@ namespace Voron.Data.RawData
                     pageHeader->PageNumber);
 
             if (sizes->AllocatedSize < size)
-            {
+            {                
                 writePos = (byte*)0;
                 return false; // can't write here
             }
