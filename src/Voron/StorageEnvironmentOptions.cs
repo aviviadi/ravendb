@@ -210,6 +210,8 @@ namespace Voron
 
             OwnsPagers = true;
 
+            ManualFlushing = true;
+
             IncrementalBackupEnabled = false;
 
             IoMetrics = new IoMetrics(256, 256, ioChangesNotifications);

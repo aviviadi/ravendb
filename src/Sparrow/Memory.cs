@@ -1,12 +1,42 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Text;
+using System.Threading;
 using Sparrow.Binary;
 
 namespace Sparrow
 {
     public static unsafe class Memory
     {
+        private static int _cnt = 0;
+        private static uint _pos = 0;
+        private static readonly object Obj = new object();
+        public static IntPtr Ptr = IntPtr.Zero;
+        public const int Size = 2 * 1024 * 1024;
+
+        public static void LogToMem(string txt)
+        {
+            lock (Obj)
+            {
+                if (Ptr == IntPtr.Zero)
+                    return;
+                
+                var c = Interlocked.Increment(ref _cnt);
+                var bytes = Encoding.ASCII.GetBytes($"[{c}]::{txt}=|=");
+                var len = (uint)bytes.Length;
+                if (_pos + len >= Size)
+                    _pos = 0;
+                unsafe
+                {
+                    fixed (byte* pBytes = bytes)
+                    {
+                        Unsafe.CopyBlock(new IntPtr(Ptr.ToInt64() + _pos).ToPointer(), pBytes, len);
+                    }
+                }
+                _pos += len;
+            }
+        }
         public const int CompareInlineVsCallThreshold = 256;
 
         public static int Compare(byte* p1, byte* p2, int size)

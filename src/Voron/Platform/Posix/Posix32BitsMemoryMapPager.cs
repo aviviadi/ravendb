@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.MemoryMappedFiles;
 using System.Runtime.InteropServices;
 using System.Threading;
 using Sparrow;
@@ -197,7 +198,7 @@ namespace Voron.Platform.Posix
         }
 
         public override byte* AcquirePagePointer(IPagerLevelTransactionState tx, long pageNumber, PagerState pagerState = null)
-        {
+        {            
             if (DisposeOnceRunner.Disposed)
                 ThrowAlreadyDisposedException();
 
@@ -210,9 +211,13 @@ namespace Voron.Platform.Posix
             var allocationStartPosition = pageNumber - distanceFromStart;
 
             if (state.LoadedPages.TryGetValue(allocationStartPosition, out var page))
+            {
+                Memory.LogToMem($"AcquirePagePointer1:{new IntPtr(page.Pointer + (distanceFromStart * Constants.Storage.PageSize)).ToInt64():X}");
                 return page.Pointer + (distanceFromStart * Constants.Storage.PageSize);
+            }
 
             page = MapPages(state, allocationStartPosition, AllocationGranularity);
+            Memory.LogToMem($"AcquirePagePointer2:{new IntPtr(page.Pointer + (distanceFromStart * Constants.Storage.PageSize)).ToInt64():X}");
             return page.Pointer + (distanceFromStart * Constants.Storage.PageSize);
         }
 
@@ -229,6 +234,7 @@ namespace Voron.Platform.Posix
                         continue;
 
                     Interlocked.Increment(ref addr.Usages);
+                    Memory.LogToMem($"MapPages2:{new IntPtr(startPage).ToInt64():X},{addr.Size},{addr.Address.ToInt64():X},{FileName.FullPath}");
                     return AddMappingToTransaction(state, startPage, size, addr);
                 }
 
@@ -244,6 +250,8 @@ namespace Voron.Platform.Posix
                     MmapProts.PROT_READ | MmapProts.PROT_WRITE,
                     mmflags, _fd, offset);
 
+                Memory.LogToMem($"MapPages:{startingBaseAddressPtr.ToInt64():X},{size},{offset},{FileName.FullPath}");
+                
                 if (startingBaseAddressPtr.ToInt64() == -1)
                 //system didn't succeed in mapping the address where we wanted
                 {
@@ -416,8 +424,10 @@ namespace Voron.Platform.Posix
 
                 _parent.UnprotectPageRange(destination, (ulong)toWrite);
 
+                Memory.LogToMem($"Copy:{new IntPtr(destination).ToInt64():X},{new IntPtr(source).ToInt64():X}," +
+                                $"{toWrite}");
                 Memory.Copy(destination, source, toWrite);
-
+                Memory.LogToMem($"Copy:{new IntPtr(destination).ToInt64():X}:END");
                 _parent.ProtectPageRange(destination, (ulong)toWrite);
             }
 
@@ -475,6 +485,7 @@ namespace Voron.Platform.Posix
 
             var allocationSize = newLengthAfterAdjustment - _totalAllocationSize;
 
+            Memory.LogToMem($"AllocateFileSpace:{FileName.FullPath},{allocationSize},{_totalAllocationSize + allocationSize},{newLength}");
             PosixHelper.AllocateFileSpace(_options, _fd, _totalAllocationSize + allocationSize, FileName.FullPath);
 
             if (_isSyncDirAllowed && Syscall.SyncDirectory(FileName.FullPath) == -1)
@@ -487,6 +498,11 @@ namespace Voron.Platform.Posix
             NumberOfAllocatedPages = _totalAllocationSize / Constants.Storage.PageSize;
 
             return null;
+            // ADIADI
+            
+//            var pagerState = CreatePagerState();
+//            SetPagerState(pagerState);
+//            return pagerState;
         }
 
         public override string ToString()
@@ -497,6 +513,19 @@ namespace Voron.Platform.Posix
         protected internal override void PrefetchRanges(Win32MemoryMapNativeMethods.WIN32_MEMORY_RANGE_ENTRY* list, int count)
         {
             // we never want to do this here
+        }
+        
+        private PagerState CreatePagerState()
+        {
+            var fileSize = GetFileSize();
+
+            var allocationInfo = new PagerState.AllocationInfo
+            {
+                BaseAddress = null,
+                Size = 0,
+                MappedFile = null
+            };
+            return new PagerState(this, Options.PrefetchSegmentSize, Options.PrefetchResetThreshold, allocationInfo);
         }
     }
 }

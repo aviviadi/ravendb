@@ -529,10 +529,11 @@ namespace Voron.Impl
 
             numberOfPages = VirtualPagerLegacyExtensions.GetNumberOfOverflowPages(overflowSize);
 
+            Memory.LogToMem($"AllocateOverflowRawPage: {overflowSize} {zeroPage} {pageNumber}");
             var overflowPage = AllocatePage(numberOfPages, pageNumber, previousPage, zeroPage);
             overflowPage.Flags = PageFlags.Overflow;
             overflowPage.OverflowSize = (int)overflowSize;
-
+            Memory.LogToMem($"AllocateOverflowRawPage: {overflowSize} {zeroPage} {overflowPage.PageNumber}");
             return overflowPage;
         }
 
@@ -578,6 +579,7 @@ namespace Voron.Impl
             var newPagePointer = _env.ScratchBufferPool.AcquirePagePointerForNewPage(this, pageFromScratchBuffer.ScratchFileNumber,
                 pageFromScratchBuffer.PositionInScratchBuffer, numberOfPages);
 
+            Memory.LogToMem($"Set:{zeroPage},{new IntPtr(newPagePointer).ToInt64():X},{Constants.Storage.PageSize * numberOfPages}");
             if (zeroPage)
                 Memory.Set(newPagePointer, 0, Constants.Storage.PageSize * numberOfPages);
 

@@ -326,23 +326,23 @@ namespace Raven.Server.Documents.Patch
                 return 0;
 
             ScriptRunner.SingleRun runIfMissing = null;
-            using (_database.Scripts.GetScriptRunner(_patch.Run, readOnly: false, out var run))
-            using (_patchIfMissing != default ? _database.Scripts.GetScriptRunner(_patchIfMissing.Run, readOnly: false, out runIfMissing) : (IDisposable)null)
-            {
-                foreach (var item in _ids)
-                {
-                    if (!(item is BlittableJsonReaderObject bjro))
-                        throw new InvalidOperationException();
-
-                    if (bjro.TryGet(nameof(ICommandData.Id), out string id) == false)
-                        throw new InvalidOperationException();
-
-                    bjro.TryGet(nameof(ICommandData.ChangeVector), out LazyStringValue expectedChangeVector);
-
-                    var patchResult = ExecuteOnDocument(context, id, expectedChangeVector, run, runIfMissing);
-                    _patchResults.Add((id, patchResult));
-                }
-            }
+//            using (_database.Scripts.GetScriptRunner(_patch.Run, readOnly: false, out var run))
+//            using (_patchIfMissing != default ? _database.Scripts.GetScriptRunner(_patchIfMissing.Run, readOnly: false, out runIfMissing) : (IDisposable)null)
+//            {
+//                foreach (var item in _ids)
+//                {
+//                    if (!(item is BlittableJsonReaderObject bjro))
+//                        throw new InvalidOperationException();
+//
+//                    if (bjro.TryGet(nameof(ICommandData.Id), out string id) == false)
+//                        throw new InvalidOperationException();
+//
+//                    bjro.TryGet(nameof(ICommandData.ChangeVector), out LazyStringValue expectedChangeVector);
+//
+//                    var patchResult = ExecuteOnDocument(context, id, expectedChangeVector, run, runIfMissing);
+//                    _patchResults.Add((id, patchResult));
+//                }
+//            }
 
             return _ids.Length;
         }
@@ -399,12 +399,12 @@ namespace Raven.Server.Documents.Patch
         {
             ScriptRunner.SingleRun runIfMissing = null;
 
-            using (_database.Scripts.GetScriptRunner(_patch.Run, readOnly: false, out var run))
-            using (_patchIfMissing != default ? _database.Scripts.GetScriptRunner(_patchIfMissing.Run, readOnly: false, out runIfMissing) : (IDisposable)null)
-            {
-                PatchResult = ExecuteOnDocument(context, _id, _expectedChangeVector, run, runIfMissing);
-                return 1;
-            }
+//            using (_database.Scripts.GetScriptRunner(_patch.Run, readOnly: false, out var run))
+//            using (_patchIfMissing != default ? _database.Scripts.GetScriptRunner(_patchIfMissing.Run, readOnly: false, out runIfMissing) : (IDisposable)null)
+//            {
+//                PatchResult = ExecuteOnDocument(context, _id, _expectedChangeVector, run, runIfMissing);
+               return 1;
+//            }
         }
 
         public override string HandleReply(DynamicJsonArray reply, HashSet<string> modifiedCollections)

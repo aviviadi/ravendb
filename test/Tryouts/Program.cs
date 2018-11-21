@@ -15,22 +15,71 @@ using SlowTests.Issues;
 using SlowTests.MailingList;
 using Sparrow.Logging;
 using StressTests.Client.Attachments;
+using Voron;
 using Xunit;
 
 namespace Tryouts
 {
-    public static class Program
+    public unsafe static class Program
     {
         public static void Main(string[] args)
         {
-            for (int i = 0; i < 1000; i++)
+            var options = StorageEnvironmentOptions.ForPath("test2");
+            options.ManualFlushing = true;
+            options.ForceUsing32BitsPager = true;
+            var env = new StorageEnvironment(options);
+
+            using (var txw = env.WriteTransaction())
             {
-                Console.WriteLine(i);
-                using (var test = new RDBC_128())
+                var tree = txw.CreateTree("test");
+
+                byte[] value = new byte[8200];
+                for (int i = 0; i < value.Length; i++)
                 {
-                    test.IndexingOfLoadDocumentWhileChanged();
+                    value[i] = 1;
+                }
+                tree.Add("test", value);
+                for (int i = 0; i < value.Length; i++)
+                {
+                    value[i] = 2;
+                }
+                tree.Add("test2", value);
+                
+                txw.Commit();
+            }
+
+            using (var txr = env.ReadTransaction())
+            {
+                var tree = txr.ReadTree("test");
+
+                var r = tree.Read("test");
+                if (r.Reader.Length != 8200)
+                {
+                    Console.WriteLine("size");
+                }
+                for (int i = 0; i < r.Reader.Length; i++)
+                {
+                    if (r.Reader.Base[i] != 1)
+                    {
+                        Console.WriteLine("Err");
+                    }
+                }
+                
+                r = tree.Read("test2");
+                if (r.Reader.Length != 8200)
+                {
+                    Console.WriteLine("size");
+                }
+                for (int i = 0; i < r.Reader.Length; i++)
+                {
+                    if (r.Reader.Base[i] != 2)
+                    {
+                        Console.WriteLine("Err");
+                    }
                 }
             }
+
+            Console.WriteLine("Success");
         }
     }
 }

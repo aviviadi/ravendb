@@ -270,6 +270,7 @@ namespace Voron.Impl.Paging
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private byte* AcquirePagePointerInternal(IPagerLevelTransactionState tx, long pageNumber, PagerState pagerState)
         {
+            Memory.LogToMem($"AcquirePagePointer4:Abstract..But??..");
             if (DisposeOnceRunner.Disposed)
                 goto AlreadyDisposed;
 
@@ -279,6 +280,8 @@ namespace Voron.Impl.Paging
             var state = pagerState ?? _pagerState;
 
             tx?.EnsurePagerStateReference(state);
+
+            Memory.LogToMem($"AcquirePagePointer5:{new IntPtr(state.MapBase + pageNumber * Constants.Storage.PageSize).ToInt64():X}");
 
             return state.MapBase + pageNumber * Constants.Storage.PageSize;
 

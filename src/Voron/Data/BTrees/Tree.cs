@@ -306,7 +306,9 @@ namespace Voron.Data.BTrees
             if (AbstractPager.IsKeySizeValid(key.Size) == false)
                 ThrowInvalidKeySize(key);
 
+            Memory.LogToMem($"DirectAdd:{len}");
             var foundPage = FindPageFor(key, node: out TreeNodeHeader* node, cursor: out TreeCursorConstructor cursorConstructor, allowCompressed: true);
+            Memory.LogToMem($"DirectAdd:{len},{new IntPtr(node).ToInt64():X}");
             var page = ModifyPage(foundPage);
 
             bool? shouldGoToOverflowPage = null;
@@ -332,6 +334,7 @@ namespace Voron.Data.BTrees
                     if (TryOverwriteDataOrMultiValuePageRefNode(node, len, nodeType, out pos))
                     {
                         ptr = pos;
+                        Memory.LogToMem($"DirectAddRc:{len},{new IntPtr(ptr).ToInt64():X}");
                         return new DirectAddScope(this);
                     }
                 }
@@ -341,6 +344,7 @@ namespace Voron.Data.BTrees
                     if (TryOverwriteOverflowPages(node, len, out pos))
                     {
                         ptr = pos;
+                        Memory.LogToMem($"DirectAddRc:{len},{new IntPtr(ptr).ToInt64():X}");
                         return new DirectAddScope(this);
                     }
                 }
@@ -381,6 +385,7 @@ namespace Voron.Data.BTrees
                     DebugValidateTree(State.RootPageNumber);
 
                     ptr = overFlowPos == null ? dataPos : overFlowPos;
+                    Memory.LogToMem($"DirectAddRc2:{len},{new IntPtr(ptr).ToInt64():X}");
                     return new DirectAddScope(this);
                 }
 
@@ -408,6 +413,7 @@ namespace Voron.Data.BTrees
             page.DebugValidate(this, State.RootPageNumber);
 
             ptr = overFlowPos == null ? dataPos : overFlowPos;
+            Memory.LogToMem($"DirectAddRc3:{len},{new IntPtr(ptr).ToInt64():X}");
             return new DirectAddScope(this);
         }
 
@@ -525,6 +531,7 @@ namespace Voron.Data.BTrees
             if (node->Flags == (TreeNodeFlags.PageRef)) // this is an overflow pointer
             {
                 var overflowPage = GetReadOnlyTreePage(node->PageNumber);
+                Memory.LogToMem($"FreePage:{new IntPtr(node).ToInt64():X},{node->PageNumber}");
                 FreePage(overflowPage);
             }
 

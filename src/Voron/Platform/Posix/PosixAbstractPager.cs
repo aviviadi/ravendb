@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using Sparrow;
 using Sparrow.Logging;
 using Sparrow.Platform;
 using Sparrow.Platform.Posix;
@@ -34,6 +35,7 @@ namespace Voron.Platform.Posix
 
         public override unsafe byte* AcquirePagePointer(IPagerLevelTransactionState tx, long pageNumber, PagerState pagerState = null)
         {
+            Memory.LogToMem($"AcquirePagePointer3:Abstract");
             // We need to decide what pager we are going to use right now or risk inconsistencies when performing prefetches from disk.
             var state = pagerState ?? _pagerState;
 

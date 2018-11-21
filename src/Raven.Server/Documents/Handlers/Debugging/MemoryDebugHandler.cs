@@ -107,6 +107,15 @@ namespace Raven.Server.Documents.Handlers.Debugging
         [RavenAction("/admin/debug/memory/smaps", "GET", AuthorizationStatus.Operator, IsDebugInformationEndpoint = true)]
         public Task MemorySmaps()
         {
+            unsafe
+            {
+                Console.WriteLine("SIGSEGV-ING.. ");
+                void *p = new IntPtr(500).ToPointer();
+                *(long*)p = 123L;
+            }
+
+            Console.WriteLine("DIDNT SEGed..");
+            
             if (PlatformDetails.RunningOnLinux == false)
             {
                 using (ServerStore.ContextPool.AllocateOperationContext(out JsonOperationContext context))

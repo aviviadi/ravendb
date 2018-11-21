@@ -12,7 +12,16 @@ namespace Sparrow.Platform.Posix
     public static unsafe class Syscall
     {
         internal const string LIBC_6 = "libc";
-
+        internal const string SEGV = "segvcatch.so";
+        
+        [DllImport(SEGV, EntryPoint = "register_callback", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Unicode, SetLastError = false)]
+        [SecurityCritical]
+        public static extern IntPtr register_callback(Action callback);
+        
+        [DllImport(SEGV, EntryPoint = "register_signal", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Unicode, SetLastError = false)]
+        [SecurityCritical]
+        public static extern IntPtr register_signal();
+        
         [DllImport(LIBC_6, EntryPoint = "memcpy", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Unicode, SetLastError = false)]
         [SecurityCritical]
         public static extern IntPtr Copy(byte* dest, byte* src, long count);

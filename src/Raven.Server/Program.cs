@@ -1,11 +1,16 @@
 using System;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Runtime.Loader;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Lextm.SharpSnmpLib;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.CommandLineUtils;
 using Raven.Server.Commercial;
@@ -16,6 +21,8 @@ using Raven.Server.Utils;
 using Raven.Server.Utils.Cli;
 using Sparrow.Logging;
 using Sparrow.Platform;
+using Sparrow.Platform.Posix;
+using Sparrow.Utils;
 
 namespace Raven.Server
 {
@@ -23,8 +30,56 @@ namespace Raven.Server
     {
         private static readonly Logger Logger = LoggingSource.Instance.GetLogger<Program>("Server");
 
+        public delegate void StackTraces();
+        
+        public static void PrintStackTraces()
+        {
+            Console.WriteLine("SIGSEGV Caught!");
+            Console.Out.Flush();
+
+            Console.WriteLine(Thread.CurrentThread.ManagedThreadId + " " + Thread.CurrentThread.Name);
+
+            foreach (var threadState in NativeMemory.AllThreadStats)
+            {
+                Console.WriteLine(threadState.Name + " " + threadState.Id);
+            }
+            
+            
+            Console.WriteLine(Environment.StackTrace);
+            
+            Unsafe.CopyBlockUnaligned();
+            Console.Out.Flush();
+        }
+
+        static Action printStackTraces = PrintStackTraces;
+
         public static int Main(string[] args)
         {
+            unsafe
+            {
+
+                Console.WriteLine("********");
+            Console.WriteLine("LogToMem");
+            Console.WriteLine("********");
+
+            Sparrow.Memory.Ptr = Marshal.AllocHGlobal(Sparrow.Memory.Size);
+            Console.WriteLine("{0:X}", Sparrow.Memory.Ptr.ToInt64());
+
+            Console.WriteLine("********");
+
+            
+                
+                Console.WriteLine($"Registering callback");
+                Console.Out.Flush();
+                Syscall.register_callback(printStackTraces);
+                Console.WriteLine($"Registering signal");
+                Console.Out.Flush();
+                Syscall.register_signal();
+                Console.WriteLine($"Registered");
+                Console.Out.Flush();
+                
+            }
+
             UseOnlyInvariantCultureInRavenDB();
 
             SetCurrentDirectoryToServerPath();

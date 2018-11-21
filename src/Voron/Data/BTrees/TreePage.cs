@@ -195,6 +195,7 @@ namespace Voron.Data.BTrees
         {
             Debug.Assert(n >= 0 && n < NumberOfEntries);
 
+            Memory.LogToMem($"GetNode:{(new IntPtr(Base).ToInt64() + KeysOffsets[n]):X}");
             return (TreeNodeHeader*)(Base + KeysOffsets[n]);
         }
 
