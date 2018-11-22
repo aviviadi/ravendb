@@ -71,7 +71,7 @@ namespace Sparrow.Platform
 
             
 
-            Memory.Set(firstWritablePage, 0xED, 4096 * sizeInPages); // don't assume zero'ed mem
+            Memory.Set(firstWritablePage, 0xED, 4096L * sizeInPages); // don't assume zero'ed mem
             if (remaining == 0)
                 return firstWritablePage;
             // give the memory out so its end would be at the 2nd guard page

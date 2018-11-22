@@ -113,7 +113,6 @@ namespace Raven.Server.NotificationCenter
                     tx.Commit();
                 }
             }
-
             return true;
         }
 
@@ -129,6 +128,9 @@ namespace Raven.Server.NotificationCenter
                 ? Bits.SwapBytes(postponedUntil.Value.Ticks)
                 : _postponeDateNotSpecified;
 
+            Memory.RegisterVerification((byte*)&createdAtTicks, 8UL, "store notif");
+            Memory.RegisterVerification((byte*)&postponedUntilTicks, 8UL, "store notif");
+
             using (table.Allocate(out TableValueBuilder tvb))
             {
                 tvb.Add(id.Buffer, id.Size);
@@ -138,6 +140,10 @@ namespace Raven.Server.NotificationCenter
 
                 table.Set(tvb);
             }
+            
+            Memory.UnregisterVerification((byte*)&createdAtTicks, 8UL, "store notif");
+            Memory.UnregisterVerification((byte*)&postponedUntilTicks, 8UL, "store notif");
+
         }
 
         public IDisposable ReadActionsOrderedByCreationDate(out IEnumerable<NotificationTableValue> actions)

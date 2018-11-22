@@ -83,19 +83,20 @@ namespace Raven.Server.Documents.Replication
             return etag;
         }
 
-        private static unsafe Guid ParseDbId(string changeVector, int start)
-        {
-            Guid id = Guid.Empty;
-            char* buffer = stackalloc char[24];
-            fixed (char* str = changeVector)
-            {
-                Buffer.MemoryCopy(str + start, buffer, 24 * sizeof(char), 22 * sizeof(char));
-                buffer[22] = '=';
-                buffer[23] = '=';
-                Base64.FromBase64_Decode(buffer, 24, (byte*)&id, 16);
-            }
-            return id;
-        }
+//        private static unsafe Guid ParseDbId(string changeVector, int start)
+//        {
+//            Guid id = Guid.Empty;
+//            char* buffer = stackalloc char[24];
+//            fixed (char* str = changeVector)
+//            {
+//                Sparrow.Memory.RegisterVerification(str, (ulong)sizeof(char)*24UL, );
+//                Sparrow.Memory.BufferMemoryCopy((byte *)str + start, (byte *)buffer, 24 * sizeof(char), 22 * sizeof(char));
+//                buffer[22] = '=';
+//                buffer[23] = '=';
+//                Base64.FromBase64_Decode(buffer, 24, (byte*)&id, 16);
+//            }
+//            return id;
+//        }
 
 
         public static ChangeVectorEntry[] ToChangeVector(this string changeVector)

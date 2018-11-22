@@ -915,7 +915,7 @@ namespace Voron
 
                 foreach (var headerSpace in _headers)
                 {
-                    Marshal.FreeHGlobal(headerSpace.Value);
+                    Memory.MarshalFreeHGlobal(headerSpace.Value);
                 }
 
                 _headers.Clear();

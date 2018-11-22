@@ -1,20 +1,38 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Timers;
 using Sparrow.Binary;
+using Sparrow.Platform.Posix;
 
 namespace Sparrow
 {
     public static unsafe class Memory
     {
+        public static bool DisableFence = true;
         public const bool RecordStack = false;
         public const bool RecordHistory = false;
         
-        public const int CompareInlineVsCallThreshold = 256;
+        public const int CompareInlineVsCallThreshold = 0/*256*/;
 
+
+        public static int Move(byte* dest, byte* src, int count)
+        {
+            VerifyMappedRange(dest, src, count);
+            return Syscall.Move(dest, src, count);
+        }
+        
+        
+        
         public static int Compare(byte* p1, byte* p2, int size)
         {
             return CompareInline(p1, p2, size);
+        }
+        
+        public static int Compare(byte* p1, byte* p2, long size)
+        {
+            return CompareInline(p1, p2, (int)size);
         }
 
         public static int Compare(byte* p1, byte* p2, int size, out int position)
@@ -189,7 +207,11 @@ namespace Sparrow
         public static void Copy(void* dest, void* src, uint n)
         {
             VerifyMappedRange(dest, src, n);
+            //Console.WriteLine("in1");
+            //Console.Out.Flush();
             Unsafe.CopyBlock(dest, src, n);
+            //Console.WriteLine("ou1");
+            //Console.Out.Flush();
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -198,12 +220,23 @@ namespace Sparrow
             if (n < uint.MaxValue)
             {
                 VerifyMappedRange(dest, src, (uint)n);
+                //Console.WriteLine("in2");
+                //Console.Out.Flush();
                 Unsafe.CopyBlock(dest, src, (uint)n); // Common code-path
+                //Console.WriteLine("ou2");
+                //Console.Out.Flush();
                 return;
             }
 
             VerifyMappedRange(dest, src, n);
             BulkCopy(dest, src, n);
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static IntPtr SyscallCopy(byte* dest, byte* src, long n)
+        {
+            Copy(dest, src, n);
+            return IntPtr.Zero;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -212,13 +245,21 @@ namespace Sparrow
             VerifyMappedRange(dest, n);
             Unsafe.InitBlock(dest, value, n);
         }
-
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Set(byte* dest, byte value, int n)
+        public static IntPtr Set(byte* dest, int value, long n)
         {
             VerifyMappedRange(dest, n);
-            Unsafe.InitBlock(dest, value, (uint)n);
+            Unsafe.InitBlock(dest, (byte)value, (uint)n);
+            return IntPtr.Zero;            
         }
+
+//        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+//        public static void Set(byte* dest, byte value, int n)
+//        {
+//            VerifyMappedRange(dest, n);
+//            Unsafe.InitBlock(dest, value, (uint)n);
+//        }
 
         /// <summary>
         /// Set is optimized to handle copy operations where n is statistically small.       
@@ -273,7 +314,8 @@ namespace Sparrow
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void RegisterVerification(IntPtr start, UIntPtr length, string allocator)
         {
-            return;
+            if (DisableFence)
+                return;
             var s = (ulong)start.ToInt64();
             if (s == 0)
             {
@@ -302,7 +344,8 @@ namespace Sparrow
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void UnregisterVerification(IntPtr start, UIntPtr length, string deallocator)
         {
-            return;
+            if (DisableFence)
+                return;
             var s = (ulong)start.ToInt64();
             lock (Lockobj)
             {
@@ -438,6 +481,7 @@ namespace Sparrow
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void VerifyMappedRange(void* p1, void* p2, long size)
         {
+            if (DisableFence)
             return;
             VerifyMappedRange(p1, size, "dest");
             VerifyMappedRange(p2, size, "src");
@@ -446,7 +490,8 @@ namespace Sparrow
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void VerifyMappedRange(void* p1, long size, string debug = "None")
         {
-            return;
+            if (DisableFence)
+                return;
             lock (Lockobj)
             {
                 var (pAllowedStart, lst) = GetNearestAddress(new UIntPtr(p1).ToUInt64());
@@ -493,10 +538,16 @@ namespace Sparrow
 
                 DumpRanges();
 
-                Console.ReadKey();
+                var now = DateTime.Now;
+                Console.WriteLine(now + "Now setting timer to one second ahead");
                 Console.Out.Flush();
+                
+                
             }
         }
+
+        
+        
 
         private static void DumpRanges()
         {
@@ -529,6 +580,22 @@ namespace Sparrow
 
                 Console.WriteLine("----------");
             }
-        }        
+        }
+
+        public static void BufferMemoryCopy(byte* from, byte* to, uint sizeToCopyFrom, uint sizeToCopyTo)
+        {
+            VerifyMappedRange(from, sizeToCopyFrom, "BufferFrom");
+            VerifyMappedRange(from, sizeToCopyTo, "BufferTo");
+            Buffer.MemoryCopy(from, to, sizeToCopyFrom, sizeToCopyTo);
+        }
+
+        public static void MarshalFreeHGlobal(IntPtr headerSpaceValue)
+        {
+            Console.WriteLine("FreeIn");
+            Console.Out.Flush();
+            Marshal.FreeHGlobal(headerSpaceValue);
+            Console.WriteLine("FreeOu");
+            Console.Out.Flush();
+        }
     }
 }

@@ -135,7 +135,9 @@ namespace Sparrow.Json.Parsing
                     var sizeToCopy = len - i - 1;
                     //here we only shifting by 5 bytes since we are going to override the byte at the current position.
                     // source and destination blocks may overlap so we using Buffer.MemoryCopy to handle that scenario.
-                    Buffer.MemoryCopy(from, to, (uint)sizeToCopy, (uint)sizeToCopy);
+                    
+                    Memory.BufferMemoryCopy(from, to, (uint)sizeToCopy, (uint)sizeToCopy);
+                    
                     str[i] = (byte)'\\';
                     str[i + 1] = (byte)'u';
                     fixed (byte* controlString = AbstractBlittableJsonTextWriter.ControlCodeEscapes[value])

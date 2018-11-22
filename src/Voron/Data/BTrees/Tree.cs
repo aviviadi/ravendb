@@ -259,9 +259,9 @@ namespace Voron.Data.BTrees
 
             using (DirectAdd(key, value.Size, out byte* ptr))
             {
-                // Memory.RegisterVerification(new IntPtr((byte*)ptr), new UIntPtr((ulong)value.Size), "assumeWorks");
+                 // Memory.RegisterVerification(new IntPtr((byte*)ptr), new UIntPtr((ulong)value.Size), "assumeWorks");
                 value.CopyTo(ptr);
-                // Memory.UnregisterVerification(new IntPtr((byte*)ptr), new UIntPtr((ulong)value.Size), "assumeWorks");
+                 // Memory.UnregisterVerification(new IntPtr((byte*)ptr), new UIntPtr((ulong)value.Size), "assumeWorks");
             }
         }
 

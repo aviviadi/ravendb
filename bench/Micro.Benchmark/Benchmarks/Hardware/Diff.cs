@@ -1560,7 +1560,7 @@ namespace Micro.Benchmark.Benchmarks.Hardware
                 outputPtr[1] = count;
                 outputSize += sizeof(long) * 2;
 
-                Memory.Copy/*ADIADI::Mem*/Unaligned(Output + outputSize, modified + start, (uint)count);
+                Memory.Copy/*ADIADI::Mem*/(Output + outputSize, modified + start, (uint)count);
                 OutputSize = outputSize + count;
             }
 

@@ -77,7 +77,7 @@ namespace Voron.Data.Tables
             {
                 if (isNew == false)
                     ThrowInvalidExistingBuffer();
-                Memory.Set(ptr, 0, BitmapSize); // mark all pages as free 
+                Memory.Set(ptr, 0, (long)BitmapSize); // mark all pages as free 
             }
             return allocatePage;
         }
@@ -221,7 +221,7 @@ namespace Voron.Data.Tables
                 var positionInBuffer = (int) (pageNumber - it.CurrentKey);
                 UnsetValue(fst, it.CurrentKey, positionInBuffer);
                 var page = _llt.ModifyPage(pageNumber);
-                Memory.Set(page.Pointer, 0, Constants.Storage.PageSize);
+                Memory.Set(page.Pointer, 0, (long)Constants.Storage.PageSize);
                 page.PageNumber = pageNumber;
                 page.Flags = PageFlags.Single;
             }

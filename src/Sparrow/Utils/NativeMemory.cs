@@ -91,7 +91,7 @@ namespace Sparrow.Utils
                 Interlocked.Add(ref stats.ReleasesFromOtherThreads, size);
             }
             Memory.UnregisterVerification(new IntPtr(ptr), new UIntPtr((ulong)size), "FreeHGlobal");
-            Marshal.FreeHGlobal((IntPtr)ptr);
+            Memory.MarshalFreeHGlobal((IntPtr)ptr);
         }
 
         public static void Free(byte* ptr, long size)

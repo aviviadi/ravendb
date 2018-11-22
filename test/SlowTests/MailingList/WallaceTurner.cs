@@ -35,10 +35,10 @@ namespace SlowTests.MailingList
                 return string.Format("Address: {0}, Id: {1}, SiteId: {2}", Address, Id, SiteId);
             }
 
-            public DataResult Clone()
-            {
-                return (DataResult)MemberwiseClone();
-            }
+//            public DataResult Clone()
+//            {
+//                return (DataResult)MemberwiseClone();
+//            }
         }
 
         private class DataResult_ByAddress : AbstractIndexCreationTask<DataResult>

@@ -53,7 +53,7 @@ namespace Sparrow.Platform.Posix
                 finally
                 {
                     if (vec != IntPtr.Zero)
-                        Marshal.FreeHGlobal(vec);
+                        Memory.MarshalFreeHGlobal(vec);
                 }
             }
             finally

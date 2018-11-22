@@ -188,7 +188,7 @@ namespace Sparrow.Json
                     Used = Used
                 };
                 return newSegment;
-                // return (Segment)MemberwiseClone();
+                return (Segment)MemberwiseClone();
             }
 
 #if DEBUG

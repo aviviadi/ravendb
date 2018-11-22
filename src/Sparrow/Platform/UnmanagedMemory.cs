@@ -13,7 +13,7 @@ namespace Sparrow
         {
             Debug.Assert(count >= 0);
             return PlatformDetails.RunningOnPosix
-                ? Syscall.Copy(dest, src, count)
+                ? Memory.SyscallCopy(dest, src, count)
                 : Win32UnmanagedMemory.Copy(dest, src, count);
         }
 
@@ -31,7 +31,7 @@ namespace Sparrow
         {
             Debug.Assert(count >= 0);
             return PlatformDetails.RunningOnPosix
-                ? Syscall.Move(dest, src, count)
+                ? Memory.Move(dest, src, (int)count)
                 : Win32UnmanagedMemory.Move(dest, src, count);
         }
 
@@ -40,7 +40,7 @@ namespace Sparrow
         {
             Debug.Assert(count >= 0);
             return PlatformDetails.RunningOnPosix
-                ? Syscall.Set(dest, c, count)
+                ? Memory.Set(dest, c, count)
                 : Win32UnmanagedMemory.Set(dest, c, count);
         }
     }

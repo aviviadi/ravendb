@@ -785,7 +785,8 @@ namespace Raven.Client.Documents.Conventions
         /// </summary>
         public DocumentConventions Clone()
         {
-            return (DocumentConventions)MemberwiseClone();
+            return new DocumentConventions();
+            // return (DocumentConventions)MemberwiseClone();           
         }
 
         public RangeType GetRangeType(Type type)

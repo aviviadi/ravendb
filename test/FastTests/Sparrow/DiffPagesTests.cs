@@ -217,8 +217,8 @@ namespace FastTests.Sparrow
                         Output = tmp,
                     };
 
-                    Memory.Set(tri, 0, Size);
-                    Memory.Set(tmp, 0, Size);
+                    Memory.Set(tri, (byte)0, (uint)Size);
+                    Memory.Set(tmp, (byte)0, (uint)Size);
 
                     diffPages.ComputeDiff(one, two, Size);
                     if (!diffPages.IsDiff)
