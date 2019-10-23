@@ -10,7 +10,7 @@ rvn_write_header (const char *path, void *header, int32_t size,
 		  int32_t * detailed_error_code) 
 {
 	int32_t rc;
-	HANDLE file = CreateFile(path,
+	HANDLE file = _create_file_utf8(path,
 		GENERIC_WRITE | GENERIC_READ,
 		FILE_SHARE_READ,
 		NULL,
@@ -21,6 +21,11 @@ rvn_write_header (const char *path, void *header, int32_t size,
 
 	if(file == INVALID_HANDLE_VALUE) {
 		rc = FAIL_OPEN_FILE;
+		goto error_cleanup;
+	}
+
+	if(file == 0) {
+		rc = FAIL_NOMEM;
 		goto error_cleanup;
 	}
 
@@ -42,7 +47,7 @@ rvn_write_header (const char *path, void *header, int32_t size,
 error_cleanup:
 	*detailed_error_code = GetLastError();
 
-	if(file != INVALID_HANDLE_VALUE){
+	if(file != INVALID_HANDLE_VALUE && file != 0){
 		CloseHandle(file);
 	}
 

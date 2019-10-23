@@ -29,8 +29,8 @@ rvn_open_journal_for_writes(const char* file_name, int32_t transaction_mode, int
     }
 
     int32_t rc;
-    HANDLE h_file = CreateFile(
-        file_name,
+    HANDLE h_file = CreateFileW(
+        (LPCWSTR)file_name,
         GENERIC_WRITE,
         share_flags,
         NULL,
@@ -43,6 +43,12 @@ rvn_open_journal_for_writes(const char* file_name, int32_t transaction_mode, int
         rc = FAIL_OPEN_FILE;
         goto error_cleanup;
     }
+
+    if(h_file == 0) {
+		rc = FAIL_NOMEM;
+		goto error_cleanup;
+	}
+
     *handle = h_file;
 
     LARGE_INTEGER size;
@@ -69,7 +75,7 @@ rvn_open_journal_for_writes(const char* file_name, int32_t transaction_mode, int
 error_cleanup:
     *detailed_error_code = GetLastError();
 error_clean_With_error:
-    if (h_file != INVALID_HANDLE_VALUE)
+    if (h_file != INVALID_HANDLE_VALUE && h_file != 0)
         CloseHandle(h_file);
     return rc;
 }

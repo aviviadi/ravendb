@@ -98,7 +98,7 @@ namespace Sparrow.Server.Platform
 
         private const string LIBRVNPAL = "librvnpal";
 
-        [DllImport(LIBRVNPAL, SetLastError = true)]
+        [DllImport(LIBRVNPAL, SetLastError = true, CharSet = CharSet.Auto)]
         public static extern PalFlags.FailCodes rvn_write_header(
             string filename,
             void* header,
@@ -112,7 +112,7 @@ namespace Sparrow.Server.Platform
             Int32 capacity,
             out Int32 specialErrnoCodes);
 
-        [DllImport(LIBRVNPAL, SetLastError = true)]
+        [DllImport(LIBRVNPAL, SetLastError = true, CharSet = CharSet.Auto)]
         public static extern PalFlags.FailCodes rvn_create_and_mmap64_file(
             string filename,
             Int64 initialFileSize,
@@ -171,7 +171,7 @@ namespace Sparrow.Server.Platform
             out void* newAddress,
             out Int32 errorCode);
 
-        [DllImport(LIBRVNPAL, SetLastError = true)]
+        [DllImport(LIBRVNPAL, SetLastError = true, CharSet = CharSet.Auto)]
         public static extern PalFlags.FailCodes rvn_open_journal_for_writes(
             string fileName,
             PalFlags.JournalMode mode,
@@ -214,7 +214,7 @@ namespace Sparrow.Server.Platform
             out Int32 errorCode
             );
 
-        [DllImport(LIBRVNPAL, SetLastError = true)]
+        [DllImport(LIBRVNPAL, SetLastError = true, CharSet = CharSet.Auto)]
         public static extern PalFlags.FailCodes rvn_get_path_disk_space(
             string path,
             out UInt64 totalFreeSizeInBytes,
@@ -222,7 +222,7 @@ namespace Sparrow.Server.Platform
             out Int32 errorCode
             );
 
-        [DllImport(LIBRVNPAL, SetLastError = true)]
+        [DllImport(LIBRVNPAL, SetLastError = true, CharSet = CharSet.Auto)]
         public static extern PalFlags.FailCodes rvn_open_journal_for_reads(
             string fileNameFullPath,
             out SafeJournalHandle handle,
@@ -235,7 +235,7 @@ namespace Sparrow.Server.Platform
             Int64 size,
             out Int32 errorCode);
 
-        [DllImport(LIBRVNPAL, SetLastError = true)]
+        [DllImport(LIBRVNPAL, SetLastError = true, CharSet = CharSet.Auto)]
         public static extern PalFlags.FailCodes rvn_test_storage_durability(
             string tempFilename,
             out Int32 errorCode);
