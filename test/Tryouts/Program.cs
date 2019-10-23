@@ -1,38 +1,38 @@
-using System;
+﻿using System;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using SlowTests.Client.Counters;
 using SlowTests.Cluster;
 using SlowTests.Issues;
 using SlowTests.Voron;
+using Sparrow.Server.Platform;
 using StressTests.Cluster;
-using Xunit.Sdk;
 
 namespace Tryouts
 {
-    public static class Program
+    public unsafe static class Program
     {
-        public static async Task Main(string[] args)
+
+        private const string LIBRVNPAL = @"D:\ravendb-v4.2\x64\Debug\Raven.Pal.dll";
+
+        [DllImport(LIBRVNPAL, SetLastError = true, CharSet =CharSet.Auto)]
+        public static extern PalFlags.FailCodes rvn_write_header(
+            string filename,
+            void* header,
+            Int32 size,
+            out Int32 errorCode);
+
+        public unsafe static async Task Main(string[] args)
         {
-            Console.WriteLine(Process.GetCurrentProcess().Id);
-            for (int i = 0; i < 123; i++)
-            {
-                Console.WriteLine($"Starting to run {i}");
-                try
-                {
-                    using (var test = new RavenDB_13940(new TestOutputHelper()))
-                    {
-                        test.CorruptedSingleTransactionPage_WontStopTheRecoveryIfIgnoreErrorsOfSyncedTransactionIsSet();
-                    }
-                }
-                catch (Exception e)
-                {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine(e);
-                    Console.ForegroundColor = ConsoleColor.White;
-                   // Console.ReadLine();
-                }
-            }
+            int a = 1;
+            var v = @"D:\ravendb-v4.2\src\Raven.Server\testhebrew\Databases\עורב\header.one";
+            //Console.WriteLine(Process.GetCurrentProcess().Id);
+            //Console.Read();
+            var  sss = rvn_write_header(v, (void*)&a, 4, out int bbb);
+            Console.WriteLine(sss);
+            Console.WriteLine(bbb);
+
         }
     }
 }
