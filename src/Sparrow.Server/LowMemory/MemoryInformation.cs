@@ -269,7 +269,7 @@ namespace Sparrow.LowMemory
                         totalClean.Add(result.PrivateClean, SizeUnit.Bytes);
                         sharedCleanMemory.Set(result.SharedClean, SizeUnit.Bytes);
                         totalDirty.Add(result.TotalDirty, SizeUnit.Bytes);
-                    }
+                     }
 
                     procMemInfoResults.MemAvailable = new Size(Math.Max(memAvailableInKb, memFreeInKb), SizeUnit.Kilobytes);
                     procMemInfoResults.TotalMemory = new Size(totalMemInKb, SizeUnit.Kilobytes);

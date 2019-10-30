@@ -121,6 +121,7 @@ namespace Sparrow.Platform.Posix
             var state = SearchState.None;
             var smapResultsObject = new T();
 
+
             using (var currentProcess = Process.GetCurrentProcess())
             using (var fileStream = new FileStream($"/proc/{currentProcess.Id}/smaps", FileMode.Open, FileAccess.Read, FileShare.Read))
             {
@@ -197,7 +198,9 @@ namespace Sparrow.Platform.Posix
                                 {
                                     term = _sharedCleanBytes;
                                     if (_smapsBuffer[searchedBuffer][positionToSearch] == term[j])
+                                    {
                                         continue;
+                                    }
                                 }
 
                                 if (term == _sharedCleanBytes) // didn't find SharedCleanBytes - try to find SharedDirtyBytes
