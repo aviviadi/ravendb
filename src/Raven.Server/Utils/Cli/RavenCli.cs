@@ -466,6 +466,7 @@ namespace Raven.Server.Utils.Cli
                     return false;
             }
 
+            var actionTimeWithoutFinalizers = DateTime.UtcNow - startTime;
             GC.WaitForPendingFinalizers();
             var actionTime = DateTime.UtcNow - startTime;
 
@@ -473,7 +474,8 @@ namespace Raven.Server.Utils.Cli
             WriteText("After collecting, managed memory used:  ", TextColor, cli, newLine: false);
             WriteText(new Size(AbstractLowMemoryMonitor.GetManagedMemoryInBytes(), SizeUnit.Bytes).ToString(), ConsoleColor.Cyan, cli, newLine: false);
             WriteText(" at ", TextColor, cli, newLine: false);
-            WriteText(actionTime.TotalSeconds + " Seconds", ConsoleColor.Cyan, cli);
+            WriteText(actionTime.TotalSeconds + " Seconds", ConsoleColor.Cyan, cli, newLine: false);
+            WriteText(" (Without Finalyzers: " + actionTimeWithoutFinalizers.TotalSeconds + " Seconds)", ConsoleColor.Cyan, cli);
             return true;
         }
 
