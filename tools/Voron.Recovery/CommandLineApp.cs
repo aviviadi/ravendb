@@ -93,13 +93,13 @@ namespace Voron.Recovery
                         return ExitWithError("Missing RecoverDirectory argument", cmd);
                     }
                     
-                    config.OutputFileName = Path.Combine(recoverDirectory, outputFileNameArg.HasValue() ? outputFileNameArg.Value() : RecoveryFileName);
+                    config.OutputFilePath = Path.Combine(recoverDirectory, outputFileNameArg.HasValue() ? outputFileNameArg.Value() : RecoveryFileName);
                     try
                     {
                         if (!Directory.Exists(recoverDirectory))
                             Directory.CreateDirectory(recoverDirectory);
-                        File.WriteAllText(config.OutputFileName, "I have write permission!");
-                        File.Delete(config.OutputFileName);
+                        File.WriteAllText(config.OutputFilePath, "I have write permission!");
+                        File.Delete(config.OutputFilePath);
                     }
                     catch
                     {

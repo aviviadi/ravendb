@@ -74,7 +74,7 @@ namespace SlowTests.Issues
                 LoggingMode = Sparrow.Logging.LogMode.None,
                 DataFileDirectory = dbPath,
                 PathToDataFile = Path.Combine(dbPath, "Raven.voron"),
-                OutputFileName = Path.Combine(recoveryExportPath, "recovery.ravendump"),
+                OutputFilePath = Path.Combine(recoveryExportPath, "recovery.ravendump"),
                 MasterKey = masterKey,
                 DisableCopyOnWriteMode = nullifyMasterKey
             }))
